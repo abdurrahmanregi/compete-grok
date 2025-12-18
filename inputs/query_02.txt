@@ -1,0 +1,4 @@
+QUERY:
+"""
+explain step by step BLP demand estimation. how is it being used in competition analysis?
+"""

@@ -1,0 +1,6 @@
+QUERY:
+"""
+do a deep research on merger controls papers in IO economics and antitrust. 
+focus on top econ journals (general and field journals).
+also focus on good preprint outlets such as NBER and CEPR
+"""

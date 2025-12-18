@@ -1,0 +1,10 @@
+langgraph>=0.2.0
+langchain>=0.2.0
+langchain-community>=0.2.0
+chromadb>=0.5.0  # for ephemeral RAG
+python-dotenv>=1.0.0
+openai>=1.40.0  # xAI Grok client
+pypdf>=4.0.0  # PDF utils
+requests>=2.31.0
+langchain-openai>=0.2.0
+# Note: pandoc/xelatex external; MCP tools via subprocess (no extra deps)

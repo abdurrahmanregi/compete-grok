@@ -1,0 +1,13 @@
+QUERY:
+"""
+Analyze the competitive effects of this merger using IO logics.
+Debate the potential anticompetitive concerns.
+Provide quantitative analysis and legal precedents.
+"""
+FILES:
+"""
+merger_agreement.pdf
+market_data.xlsx
+financial_statements.pdf
+competition_analysis.docx
+"""
