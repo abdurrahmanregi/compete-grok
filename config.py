@@ -17,6 +17,7 @@ MARKETDEF_MODEL = "grok-4-0709"
 DOCANALYZER_MODEL = "grok-4-1-fast-non-reasoning"
 CASELAW_MODEL = "grok-4-1-fast-reasoning"
 SYNTHESIS_MODEL = "grok-4-1-fast-non-reasoning"
+REMEDIATION_MODEL = "grok-4-1-fast-reasoning"
 # Debate Module Agents
 DEBATE_PRO_MODEL = "grok-4-0709"
 DEBATE_CON_MODEL = "grok-4-0709"

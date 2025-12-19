@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, Sequence
+from typing import TypedDict, Annotated, Sequence, Optional
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 import operator
@@ -147,6 +147,9 @@ class AgentState(TypedDict):
     debate_round: int
     debate_count: int
     force_debate: bool
+    last_error: Optional[str]
+    remediation_decision: Optional[dict]
+    last_agent: str
 
 def parse_route_tool(name: str) -> str:
     if name.startswith("route_to_"):
@@ -211,20 +214,27 @@ def route_supervisor(state):
             return END
         return routes[0]  # Single route for conditional; extend to parallel if needed
 
-    # If no routes and high iteration count, route to synthesis for final synthesis
-    if iteration_count >= config.MAX_ITERATIONS:
-        return "synthesis"
+    # If no routes, route to synthesis for final synthesis
+    return "synthesis"
 
-    if state.get("force_debate", False):
-        return "debate"
+def route_agent(state):
+    if state.get("last_error"):
+        return "remediation"
+    else:
+        return "supervisor"
 
-    route_data = parse_supervisor_output(state)
-    if should_force_debate(route_data):
-        return "debate"
-    route = route_data.get("route", "END")
-    if route in ["END", "__end__"]:
+def route_remediation(state):
+    decision = state.get("remediation_decision", {})
+    action = decision.get("action")
+    if action == "rephrase":
+        return state.get("last_agent", "supervisor")
+    elif action == "fallback":
+        # For simplicity, go to supervisor to handle fallback
+        return "supervisor"
+    elif action == "abort":
         return END
-    return agent_map.get(route, "supervisor")
+    else:
+        return "supervisor"
 
 AGENT_NAMES = ["econpaper", "econquant", "explainer", "marketdef", "docanalyzer", "caselaw", "synthesis"]
 
@@ -273,7 +283,9 @@ def create_agent_node(agent_name: str):
                 "iteration_count": state.get("iteration_count", 0) + 1,
                 "routing_history": state.get("routing_history", []) + [agent_name],
                 "final_synthesis": final_synthesis,
-                "sources": state.get("sources", []) + new_sources
+                "sources": state.get("sources", []) + new_sources,
+                "last_error": None,
+                "last_agent": agent_name
             }
         except Exception as e:
             logger.error(f"Error in {agent_name}: {e}")
@@ -284,7 +296,9 @@ def create_agent_node(agent_name: str):
                 "iteration_count": state.get("iteration_count", 0) + 1,
                 "routing_history": state.get("routing_history", []) + [agent_name],
                 "final_synthesis": final_synthesis,
-                "sources": state.get("sources", [])
+                "sources": state.get("sources", []),
+                "last_error": error_msg,
+                "last_agent": agent_name
             }
     return node
 
@@ -293,11 +307,11 @@ agent_nodes = {name: create_agent_node(name) for name in AGENT_NAMES}
 # Debate subgraph
 def pro_node(state: AgentState) -> dict:
     result = agents["pro"].invoke({"messages": state["messages"]})
-    return result["messages"]
+    return {"messages": result["messages"]}
 
 def con_node(state: AgentState) -> dict:
     result = agents["con"].invoke({"messages": state["messages"]})
-    return result["messages"]
+    return {"messages": result["messages"]}
 
 def arbiter_node(state: AgentState) -> dict:
     result = agents["arbiter"].invoke({"messages": state["messages"]})
@@ -333,12 +347,60 @@ def debate_node(state: AgentState) -> dict:
         logger.error(f"Error in debate: {e}")
         return {"messages": [SystemMessage(content=f"Error in debate: {e}. Reflect: retry or caveats.")]}
 
+def remediation_node(state: AgentState) -> dict:
+    if not state.get("last_error"):
+        return state
+    try:
+        # Create message for remediation agent
+        error_msg = state["last_error"]
+        task_instructions = "Process the error and decide on remediation action."
+        tool_name = "unknown"  # Could be improved to extract from error
+        human_msg = HumanMessage(content=f"Tool '{tool_name}' failed with error: '{error_msg}'. Task: {task_instructions}")
+        result = agents["remediation"].invoke({"messages": [human_msg]})
+        # Parse JSON decision
+        content = result["messages"][-1].content
+        decision = json.loads(content)
+        logger.info(f"Remediation decision: {decision}")
+        # Handle decision
+        action = decision.get("action")
+        if action == "rephrase":
+            new_query = decision.get("new_args", {}).get("query", "Retry with rephrased query")
+            # Add system message to instruct retry
+            retry_msg = SystemMessage(content=f"Remediation: Rephrase and retry. New query: {new_query}")
+            return {
+                "messages": [retry_msg],
+                "remediation_decision": decision
+            }
+        elif action == "fallback":
+            new_tool = decision.get("new_tool", "supervisor")
+            fallback_msg = SystemMessage(content=f"Remediation: Fallback to {new_tool}")
+            return {
+                "messages": [fallback_msg],
+                "remediation_decision": decision
+            }
+        elif action == "abort":
+            abort_msg = SystemMessage(content="Remediation: Abort task")
+            return {
+                "messages": [abort_msg],
+                "remediation_decision": decision,
+                "final_synthesis": "Task aborted due to unrecoverable error."
+            }
+        else:
+            return {
+                "messages": [SystemMessage(content="Remediation: Unknown action")],
+                "remediation_decision": decision
+            }
+    except Exception as e:
+        logger.error(f"Error in remediation: {e}")
+        return {"messages": [SystemMessage(content=f"Error in remediation: {e}")]}
+
 # Main workflow
 workflow = StateGraph(AgentState)
 workflow.add_node("supervisor", supervisor_node)
 for name in AGENT_NAMES:
     workflow.add_node(name, agent_nodes[name])
 workflow.add_node("debate", debate_node)
+workflow.add_node("remediation", remediation_node)
 
 workflow.set_entry_point("supervisor")
 workflow.add_conditional_edges(
@@ -347,13 +409,16 @@ workflow.add_conditional_edges(
     {**agent_map, "__end__": END, "END": END, "supervisor": "supervisor"}
 )
 
-# Loop back from agents to supervisor
+# Conditional edges from agents: success -> supervisor, failure -> remediation
 for name in AGENT_NAMES:
     if name != "synthesis":
-        workflow.add_edge(name, "supervisor")
+        workflow.add_conditional_edges(name, route_agent, {"supervisor": "supervisor", "remediation": "remediation"})
 
 workflow.add_edge("synthesis", END)
 workflow.add_edge("debate", "supervisor")
+
+# From remediation, conditional based on decision
+workflow.add_conditional_edges("remediation", route_remediation, {**agent_map, "__end__": END, "END": END, "supervisor": "supervisor"})
 
 app = workflow.compile()
 
@@ -368,6 +433,9 @@ if __name__ == "__main__":
         "sources": [],
         "debate_round": 0,
         "debate_count": 0,
-        "force_debate": False
+        "force_debate": False,
+        "last_error": None,
+        "remediation_decision": None,
+        "last_agent": ""
     })
     print(output["messages"][-1].content)

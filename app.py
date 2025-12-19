@@ -10,6 +10,8 @@ import re
 import textwrap
 import logging
 
+from dotenv import load_dotenv; load_dotenv()
+
 def fix_md_math(md_path):
     with open(md_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()

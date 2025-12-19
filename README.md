@@ -22,10 +22,11 @@ pip install -r requirements.txt
    ```
 
 2. Edit `.env` with your API keys:
-   - `XAI_API_KEY`: Your xAI Grok API key
-   - `TAVILY_API_KEY`: Tavily search API key 
-   - `MISTRAL_API_KEY`: Mistral API key for PDF processing
-   - `LINKUP_API_KEY`: Linkup API key for deep web searches
+    - `XAI_API_KEY`: Your xAI Grok API key
+    - `TAVILY_API_KEY`: Tavily search API key
+    - `MISTRAL_API_KEY`: Mistral API key for PDF processing
+    - `LINKUP_API_KEY`: Linkup API key for deep web searches
+    - `LANGCHAIN_API_KEY`: LangSmith API key for optional tracing (currently not implemented in code)
 
 3. Ensure external MCP tools are accessible (paths configured in `config.py` for Windows; adjust for other OS).
 
@@ -40,15 +41,15 @@ python app.py --help
 CompeteGrok uses a LangGraph-based orchestration system with the following components:
 
 ### Core Architecture
-- **Supervisor Agent**: Central orchestrator that classifies queries, routes to specialized agents, manages state, and synthesizes final outputs.
-- **Specialized Agents**: Domain-specific agents (EconPaper, EconQuant, Explainer, etc.) that perform targeted tasks.
+- **Managing Partner Agent**: Central orchestrator that classifies queries, routes to specialized agents, manages state, and synthesizes final outputs.
+- **Specialized Agents**: Domain-specific agents (Economic Research Associate, Quantitative Analyst, Educational Specialist, etc.) that perform targeted tasks.
 - **Debate Subgraph**: A separate workflow for pro/con debates with an arbiter for balanced analysis.
 - **Tools Integration**: MCP (Model Context Protocol) tools for external capabilities like search, code execution, and PDF processing.
 - **State Management**: TypedDict-based state tracking iteration counts, routing history, sources, and debate rounds to prevent loops.
 
 ### Workflow Flow
 ```
-Query Input → Supervisor Classification → Agent Routing → Parallel/Serial Execution → Debate (if needed) → Synthesis → Report Generation
+Query Input → Managing Partner Classification → Agent Routing → Parallel/Serial Execution → Debate (if needed) → Synthesis → Report Generation
 ```
 
 Key features:
@@ -57,15 +58,38 @@ Key features:
 - **Ephemeral RAG**: Document uploads processed without retention for privacy.
 - **LaTeX Math Support**: Inline `\(...\)` and display `\[...\]` math rendering in outputs.
 
+## Enhanced Error Handling and Resilience
+
+CompeteGrok incorporates robust error handling mechanisms to ensure reliable operation and graceful recovery from failures. These features prevent workflow interruptions due to transient issues like API timeouts or tool failures, improving overall system resilience.
+
+### Tenacity Wrappers (`tools/wrappers.py`)
+- **Function**: Provides retry logic with exponential backoff for external MCP tools.
+- **Implementation**: Uses the `tenacity` library to wrap functions like `tavily_search`, `linkup_search`, `linkup_fetch`, `tavily_extract`, and `convert_pdf_url`.
+- **Behavior**: Retries failed operations up to 3 times with increasing delays (1-10 seconds). Raises `ToolExecutionError` if all retries fail (detected by "Mock" in response indicating failure).
+- **Reliability Improvement**: Handles transient network issues or API rate limits without halting the workflow, ensuring consistent tool availability.
+
+### RemediationAgent (`agents/agents.py`)
+- **Role**: Specialized agent for handling tool and agent failures, enabling recovery strategies.
+- **Model**: grok-4-1-fast-reasoning (xAI)
+- **Capabilities**: Analyzes error messages and decides on remediation actions: rephrase queries, fallback to alternative tools, or abort unrecoverable tasks.
+- **Interaction**: Activated when agents encounter exceptions; outputs JSON decisions for routing adjustments.
+- **Reliability Improvement**: Allows dynamic adaptation to failures, such as switching from a failing search tool to an alternative, maintaining workflow continuity.
+
+### Graph Updates for Error Handling (`graph.py`)
+- **State Enhancements**: Added `last_error`, `remediation_decision`, and `last_agent` fields to `AgentState` for error tracking.
+- **Conditional Routing**: Agents route to `remediation` on exceptions instead of failing. Remediation routes based on decisions: rephrase (back to failing agent), fallback (to supervisor), or abort (to END).
+- **Exception Handling**: All agent nodes wrapped in try-except blocks to capture and propagate errors without crashing the graph.
+- **Reliability Improvement**: Enables graceful degradation and recovery, preventing single-point failures from stopping complex multi-agent workflows. Supports iterative error resolution while maintaining state integrity.
+
 ## Agents Overview
 
-### Supervisor Agent
+### Managing Partner Agent
 - **Role**: Central orchestrator for query classification, agent routing, state management, and final synthesis.
 - **Model**: grok-4-1-fast-reasoning (xAI)
 - **Capabilities**: Planning, reflection, coordination; uses sequential thinking for hypothesis testing.
 - **Interaction**: Routes queries to agents based on triggers; monitors completion and prevents loops.
 
-### EconPaper Agent
+### Economic Research Associate Agent
 - **Role**: Searches, extracts, and synthesizes academic papers on IO economics.
 - **Model**: grok-4-1-fast-reasoning (xAI)
 - **Capabilities**: PDF handling, synthesis; prioritizes 2025 papers and highlights biases.
@@ -73,7 +97,7 @@ Key features:
 - **Triggers**: "paper", "NBER", "research", "CEPR", "arXiv", "econometrics".
 - **Interaction**: Feeds research insights to other agents; reflects on results.
 
-### EconQuant Agent
+### Quantitative Analyst Agent
 - **Role**: Performs quantitative calculations and simulations.
 - **Model**: grok-4-0709 (xAI)
 - **Capabilities**: Math/coding for HHI, UPP, GUPPI calculations; explains with LaTeX.
@@ -81,7 +105,7 @@ Key features:
 - **Triggers**: Quantitative tasks, simulations, math.
 - **Interaction**: Provides numerical results for synthesis; addresses computational limits.
 
-### Explainer Agent
+### Educational Specialist Agent
 - **Role**: Breaks down models with caveats and step-by-step derivations.
 - **Model**: grok-4-0709 (xAI)
 - **Capabilities**: Educational explanations; adaptive language; LaTeX derivations.
@@ -89,7 +113,7 @@ Key features:
 - **Triggers**: "explain", "caveats".
 - **Interaction**: Clarifies concepts; uses completion signals like "This completes the explanation".
 
-### MarketDef Agent
+### Market Definition Expert Agent
 - **Role**: Defines markets using SSNIP and hypothetical analyses.
 - **Model**: grok-4-0709 (xAI)
 - **Capabilities**: Boundary hypotheses; simulates market tests.
@@ -97,7 +121,7 @@ Key features:
 - **Triggers**: "market definition", "SSNIP".
 - **Interaction**: Informs competition analyses; notes data recency issues.
 
-### DocAnalyzer Agent
+### Document Analyst Agent
 - **Role**: Analyzes uploaded documents for insights.
 - **Model**: grok-4-1-fast-reasoning (xAI)
 - **Capabilities**: RAG/vision on PDFs; ephemeral processing.
@@ -105,7 +129,7 @@ Key features:
 - **Triggers**: "analyze document", file uploads.
 - **Interaction**: Extracts implications; auto-deletes for privacy.
 
-### CaseLaw Agent
+### Legal Precedent Specialist Agent
 - **Role**: Searches precedents and case law.
 - **Model**: grok-4-1-fast-reasoning (xAI)
 - **Capabilities**: Recency-focused legal research.
@@ -113,7 +137,7 @@ Key features:
 - **Triggers**: "case law", "precedent", "FTC", "EC Competition", "US DoJ Antitrust".
 - **Interaction**: Provides legal context; notes jurisdictional caveats.
 
-### Debate Module Agents
+### Debate Facilitators
 - **Role**: Conducts balanced pro/con debates.
 - **Models**: grok-4-0709 (xAI) for Pro, Con, and Arbiter.
 - **Capabilities**: Evidence-based arguments; iterative rounds.
@@ -121,7 +145,7 @@ Key features:
 - **Triggers**: "debate", "pro/con"; forced via `--debate` flag.
 - **Interaction**: Pro and Con advocate positions; Arbiter synthesizes; informs multi-round workflows.
 
-### SynthesisAgent
+### Synthesis Specialist
 - **Role**: Integrates all agent outputs into comprehensive insights.
 - **Model**: grok-4-0709 (xAI)
 - **Capabilities**: Coherence, reflection; aggregates sources.
@@ -205,7 +229,7 @@ python app.py --query "Calculate HHI for a market with firms of sizes 30%, 25%, 
 ## Workflow Explanation
 
 1. **Query Processing**: Input query parsed; documents converted to Markdown if uploaded.
-2. **Supervisor Classification**: Supervisor analyzes query, classifies type, and routes to relevant agents (e.g., econquant for calculations, econpaper for research).
+2. **Managing Partner Classification**: Managing Partner analyzes query, classifies type, and routes to relevant agents (e.g., Quantitative Analyst for calculations, Economic Research Associate for research).
 3. **Agent Execution**: Agents run in parallel/serial based on dependencies; use tools for external data/code execution.
 4. **Debate Integration**: If controversy detected or `--debate` used, debate subgraph runs iterative rounds informed by agent outputs.
 5. **Synthesis**: SynthesisAgent aggregates all insights, sources, and caveats into a final comprehensive response.
@@ -222,6 +246,15 @@ python app.py --query "Calculate HHI for a market with firms of sizes 30%, 25%, 
 - **PDF Report**: Rendered version with LaTeX math.
 - **Sources**: Numbered list of URLs/titles from all agents.
 - **Privacy**: Ephemeral processing; no data retention.
+
+## Governing Principles
+
+CompeteGrok operates under the following core principles to ensure rigorous, evidence-based analysis:
+
+- **Jurisdictional Specificity**: All analyses consider relevant jurisdictions (e.g., US FTC/DOJ, EU Competition) and their specific guidelines.
+- **Evidence Hierarchy & Citations**: Prioritizes primary sources (statutes, case law, empirical data) over secondary; cites sources with URLs/titles in a 'Sources' section.
+- **Structured Outputs**: Uses JSON-like structured formats for outputs where appropriate, e.g., {"hypothesis": "...", "evidence": "...", "conclusion": "..."}.
+- **Hypothesis-Driven Reasoning**: Formulates and tests hypotheses sequentially, reflecting on results.
 
 ## Key Principles and Features
 
