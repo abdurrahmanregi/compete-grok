@@ -78,6 +78,7 @@ DOCANALYZER_TOOLS = [convert_pdf_file, convert_pdf_url, tavily_extract, linkup_f
 CASELAW_TOOLS = [tavily_search, linkup_search, sequential_thinking]
 SYNTHESIS_TOOLS = [sequential_thinking]
 REMEDIATION_TOOLS = []
+TEAMFORMATION_TOOLS = [sequential_thinking]
 DEBATE_TOOLS = ALL_TOOLS
 
 # Exact prompts from AGENTS.md
@@ -107,6 +108,8 @@ SYNTHESIS_PROMPT = """You are SynthesisAgent: Synthesis expert for CompeteGrok. 
 
 REMEDIATION_PROMPT = """You are the RemediationAgent. The tool `{tool_name}` failed with the error: `{error_message}`. The original task was: `{task_instructions}`. Your goal is to recover. Your options are: 1. Rephrase: Formulate a new, simpler query for the same tool. 2. Fallback: Choose an alternative tool (e.g., if tavily_search failed, try linkup_search). 3. Abort: If the task is impossible without this tool, report failure. Output a JSON object with your decision: {'action': 'rephrase', 'new_tool': 'same_tool', 'new_args': {...}} or similar for fallback/abort."""
 
+TEAMFORMATION_PROMPT = """You are TeamFormationAgent for CompeteGrok. Analyze the user query and select the most relevant agents from the available list: econpaper, econquant, explainer, marketdef, docanalyzer, caselaw, synthesis, pro, con, arbiter. Synthesis must always be included in the selected agents list. Output only a JSON array of selected agent names, e.g., ["econquant", "explainer", "synthesis"]. Use sequentialthinking for analysis if needed."""
+
 pro_prompt = DEBATE_TEAM_PROMPT.replace("[Pro/Con]", "Pro")
 con_prompt = DEBATE_TEAM_PROMPT.replace("[Pro/Con]", "Con")
 
@@ -121,6 +124,7 @@ agents = {
     "caselaw": create_agent("caselaw", CASELAW_MODEL, CASELAW_PROMPT, CASELAW_TOOLS),
     "synthesis": create_agent("synthesis", SYNTHESIS_MODEL, SYNTHESIS_PROMPT, SYNTHESIS_TOOLS),
     "remediation": create_agent("remediation", REMEDIATION_MODEL, REMEDIATION_PROMPT, REMEDIATION_TOOLS),
+    "teamformation": create_agent("teamformation", TEAMFORMATION_MODEL, TEAMFORMATION_PROMPT, TEAMFORMATION_TOOLS),
     "pro": create_agent("pro", DEBATE_PRO_MODEL, pro_prompt, DEBATE_TOOLS),
     "con": create_agent("con", DEBATE_CON_MODEL, con_prompt, DEBATE_TOOLS),
     "arbiter": create_agent("arbiter", DEBATE_ARBITER_MODEL, ARBITER_PROMPT, DEBATE_TOOLS),

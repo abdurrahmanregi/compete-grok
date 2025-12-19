@@ -4,13 +4,15 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from langchain_core.messages import HumanMessage, AIMessage
-from graph import app as workflow  # compiled graph
+from graph import create_workflow  # function to create graph
 from tools.convert_pdf_file import convert_pdf_file  # for uploads
 import re
 import textwrap
 import logging
+import json
 
 from dotenv import load_dotenv; load_dotenv()
+from agents.agents import agents
 
 def fix_md_math(md_path):
     with open(md_path, 'r', encoding='utf-8') as f:
@@ -53,6 +55,9 @@ parser.add_argument("--output-dir", type=str, default="./outputs", help="Output 
 parser.add_argument("--debate", action="store_true", help="Force debate module regardless of supervisor routing")
 args = parser.parse_args()
 
+logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+logger = logging.getLogger(__name__)
+
 if args.query.endswith('.txt'):
     query_path = Path(args.query)
     if query_path.exists():
@@ -91,8 +96,15 @@ if args.query.endswith('.txt'):
     else:
         raise ValueError(f"Query file not found: {args.query}")
 
-logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
-logger = logging.getLogger(__name__)
+# Run TeamFormationAgent to select agents
+logger.info("Running TeamFormationAgent...")
+team_result = agents["teamformation"].invoke({"messages": [HumanMessage(content=args.query)]})
+selected_agents = json.loads(team_result["messages"][-1].content)
+logger.info(f"Selected agents: {selected_agents}")
+
+# Create workflow with selected agents
+workflow = create_workflow(selected_agents)
+
 output_dir = Path(args.output_dir)
 output_dir.mkdir(exist_ok=True)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -137,6 +149,7 @@ if args.verbose:
 # Extract report: final_synthesis
 report_content = "# CompeteGrok Analysis Report\n\n"
 report_content += f"**Query:** {args.query}\n\n"
+report_content += f"**Selected Agents:** {selected_agents}\n\n"
 report_content += f"**Timestamp:** {datetime.now()}\n\n"
 report_content += f"**Routes:** {result.get('routes', 'N/A')}\n\n"
 final_synth = result.get("final_synthesis")

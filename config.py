@@ -13,7 +13,7 @@ SUPERVISOR_MODEL = "grok-4-1-fast-reasoning"
 ECONPAPER_MODEL = "grok-4-1-fast-reasoning"
 ECONQUANT_MODEL = "grok-4-0709"
 EXPLAINER_MODEL = "grok-4-0709"
-MARKETDEF_MODEL = "grok-4-0709"
+MARKETDEF_MODEL = "grok-4-1-fast-reasoning"
 DOCANALYZER_MODEL = "grok-4-1-fast-non-reasoning"
 CASELAW_MODEL = "grok-4-1-fast-reasoning"
 SYNTHESIS_MODEL = "grok-4-1-fast-non-reasoning"
@@ -22,6 +22,7 @@ REMEDIATION_MODEL = "grok-4-1-fast-reasoning"
 DEBATE_PRO_MODEL = "grok-4-0709"
 DEBATE_CON_MODEL = "grok-4-0709"
 DEBATE_ARBITER_MODEL = "grok-4-1-fast-non-reasoning"
+TEAMFORMATION_MODEL = "grok-4-1-fast-reasoning"
 
 SAMPLING_PARAMS = {
     "default": {"temperature": 0.5, "top_p": 0.95, "extra_body": {"top_k": 20}},
@@ -68,6 +69,6 @@ LOG_LEVEL = 'DEBUG' if os.getenv('VERBOSE') else 'INFO'
 MAX_ITERATIONS = 1
 
 # Additional iteration and debate parameters
-MAX_CURRENT_ITERATION = 3
+MAX_CURRENT_ITERATION = 5
 HISTORY_THRESHOLD = 1
 DEBATE_ROUND_LIMIT = 1

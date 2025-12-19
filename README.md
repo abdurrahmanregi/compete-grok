@@ -58,6 +58,35 @@ Key features:
 - **Ephemeral RAG**: Document uploads processed without retention for privacy.
 - **LaTeX Math Support**: Inline `\(...\)` and display `\[...\]` math rendering in outputs.
 
+## Dynamic Agent Composition
+
+CompeteGrok features dynamic agent composition, allowing the system to assemble tailored teams of specialized agents based on the specific requirements of each query. This adaptive approach ensures optimal resource allocation and comprehensive analysis.
+
+### How It Works
+
+1. **Query Analysis**: The Team Formation Agent analyzes the incoming query to identify key elements such as topics, required expertise, and complexity.
+2. **Agent Selection**: Based on predefined triggers and relevance criteria, the agent selects the most appropriate combination of specialized agents from the available pool (e.g., Economic Research Associate, Quantitative Analyst, Educational Specialist).
+3. **Team Assembly**: The selected agents are dynamically composed into a collaborative team, with the Managing Partner Agent overseeing coordination and workflow.
+4. **Execution and Synthesis**: The team executes their tasks in parallel or sequentially as needed, with results synthesized into a cohesive final output.
+
+### Benefits
+
+- **Efficiency**: Only relevant agents are activated, reducing computational overhead and response time.
+- **Relevance**: Tailored agent combinations ensure comprehensive coverage of query-specific aspects.
+- **Scalability**: Easily accommodates new agents and query types without manual reconfiguration.
+- **Flexibility**: Adapts to complex, multi-disciplinary queries requiring diverse expertise.
+
+### Integration with Existing Features
+
+Dynamic agent composition integrates seamlessly with CompeteGrok's core architecture:
+
+- **Managing Partner Integration**: The Managing Partner Agent can leverage the Team Formation Agent for initial routing decisions.
+- **Debate Subgraph**: Selected teams can include debate facilitators for controversial topics.
+- **Error Handling**: The RemediationAgent can adjust team composition in response to failures.
+- **State Management**: Team composition is tracked in the AgentState for loop prevention and workflow continuity.
+
+This feature enhances the system's ability to handle diverse and evolving query patterns in IO economics and competition law analysis.
+
 ## Enhanced Error Handling and Resilience
 
 CompeteGrok incorporates robust error handling mechanisms to ensure reliable operation and graceful recovery from failures. These features prevent workflow interruptions due to transient issues like API timeouts or tool failures, improving overall system resilience.

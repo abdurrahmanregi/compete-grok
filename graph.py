@@ -129,13 +129,6 @@ If documents are present in the state, prioritize docanalyzer.
 
 **FINAL SYNTHESIS:** When finishing without tool calls, provide a comprehensive, complete synthesis that directly answers the original query using all information from agent outputs. Include step-by-step explanations, mathematical derivations, caveats, and references as appropriate. Do not provide partial or summary responses."""
 
-supervisor_router = create_agent(
-    "supervisor_router",
-    SUPERVISOR_MODEL,
-    ROUTER_PROMPT,
-    tools=router_tools + [sequential_thinking]
-)
-
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     routes: list[str]
@@ -156,67 +149,6 @@ def parse_route_tool(name: str) -> str:
         return name[9:]
     raise ValueError(f"Unknown route tool: {name}")
 
-def supervisor_node(state: AgentState) -> dict:
-    try:
-        # Add state info for supervisor visibility
-        state_info = SystemMessage(content=f"Current state: iteration_count={state.get('iteration_count', 0)}, routing_history={state.get('routing_history', [])}, debate_count={state.get('debate_count', 0)}, force_debate={state.get('force_debate', False)}")
-        current_messages = state["messages"] + [state_info]
-
-        result = supervisor_router.invoke({"messages": current_messages})
-        messages = result["messages"]
-        routes = []
-        for msg in messages:
-            if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    if tc["name"].startswith("route_to_"):
-                        routes.append(parse_route_tool(tc["name"]))
-        routes = list(set(routes))  # unique
-
-        # Loop prevention logic
-        current_iteration = state.get("iteration_count", 0) + 1
-        routing_history = state.get("routing_history", []) + routes
-
-        # Check for loops
-        if current_iteration >= config.MAX_CURRENT_ITERATION:  # Hard limit
-            routes = []
-        elif len([h for h in routing_history if h in routes]) > config.HISTORY_THRESHOLD:  # Same agent twice
-            routes = []
-
-        # Set synthesis if no routes determined
-        final_synthesis = ""
-        if not routes:
-            if messages:
-                last_msg = messages[-1]
-                if isinstance(last_msg, AIMessage):
-                    final_synthesis = last_msg.content
-
-        logger.info(f"Node supervisor complete, routes: {routes}, iteration: {current_iteration}")
-        return {
-            "messages": operator.add(state["messages"], messages),
-            "routes": routes,
-            "iteration_count": state.get("iteration_count", 0),
-            "routing_history": routing_history,
-            "final_synthesis": final_synthesis,
-            "sources": state.get("sources", [])
-        }
-    except Exception as e:
-        logger.error(f"Error in supervisor: {e}")
-        return {"messages": [SystemMessage(content=f"Error in supervisor: {e}. Reflect: retry or caveats.")]}
-
-def route_supervisor(state):
-    routes = state.get("routes", [])
-    iteration_count = state.get("iteration_count", 0)
-    routing_history = state.get("routing_history", [])
-
-    if routes:
-        # Check if routing to same agent repeatedly
-        if any(routing_history.count(route) > 1 for route in routes):
-            return END
-        return routes[0]  # Single route for conditional; extend to parallel if needed
-
-    # If no routes, route to synthesis for final synthesis
-    return "synthesis"
-
 def route_agent(state):
     if state.get("last_error"):
         return "remediation"
@@ -236,73 +168,194 @@ def route_remediation(state):
     else:
         return "supervisor"
 
-AGENT_NAMES = ["econpaper", "econquant", "explainer", "marketdef", "docanalyzer", "caselaw", "synthesis"]
+def create_workflow(selected_agents):
+    # Filter selected agents to valid ones
+    valid_agents = ["econpaper", "econquant", "explainer", "marketdef", "docanalyzer", "caselaw", "synthesis"]
+    AGENT_NAMES = [name for name in selected_agents if name in valid_agents]
+    include_debate = any(name in selected_agents for name in ["pro", "con", "arbiter"])
 
-agent_map = {name: name for name in AGENT_NAMES + ["debate"]}
+    # Filter router_tools based on selected agents
+    router_tools_filtered = []
+    for tool in router_tools:
+        route_name = parse_route_tool(tool.name) if tool.name.startswith("route_to_") else None
+        if route_name and route_name in AGENT_NAMES:
+            router_tools_filtered.append(tool)
+        elif tool.name == "route_to_debate" and include_debate:
+            router_tools_filtered.append(tool)
+        elif tool.name == "route_to_synthesis" and "synthesis" in AGENT_NAMES:
+            router_tools_filtered.append(tool)
 
-def create_agent_node(agent_name: str):
-    def node(state: AgentState) -> dict:
-        try:
-            # For synthesis, filter messages to reduce context size
-            messages_to_use = state["messages"]
-            if agent_name == "synthesis":
-                # Filter to key agent outputs: AIMessages without tool_calls (final responses) that are not routing messages
-                filtered_messages = []
-                for msg in state["messages"]:
-                    if isinstance(msg, AIMessage):
-                        content_lower = msg.content.lower()
-                        # Exclude supervisor routing messages and messages with tool_calls
-                        if not any(word in content_lower for word in ["route", "current state", "force debate"]) and not hasattr(msg, "tool_calls") or not msg.tool_calls:
+    # Create supervisor with filtered tools
+    supervisor_router_filtered = create_agent(
+        "supervisor_router",
+        SUPERVISOR_MODEL,
+        ROUTER_PROMPT,
+        tools=router_tools_filtered + [sequential_thinking]
+    )
+
+    agent_map = {name: name for name in AGENT_NAMES}
+    if include_debate:
+        agent_map["debate"] = "debate"
+
+    def route_supervisor(state):
+        routes = state.get("routes", [])
+        iteration_count = state.get("iteration_count", 0)
+        routing_history = state.get("routing_history", [])
+
+        if routes:
+            # Check if routing to same agent repeatedly
+            if any(routing_history.count(route) > 1 for route in routes):
+                return END
+            return routes[0]  # Single route for conditional; extend to parallel if needed
+
+        # If no routes, route to synthesis for final synthesis if synthesis is selected, else end
+        if "synthesis" in AGENT_NAMES:
+            return "synthesis"
+        else:
+            return END
+
+    def create_agent_node(agent_name: str):
+        def node(state: AgentState) -> dict:
+            try:
+                # For synthesis, filter messages to reduce context size
+                messages_to_use = state["messages"]
+                if agent_name == "synthesis":
+                    # Filter to key agent outputs: AIMessages without tool_calls (final responses) that are not routing messages
+                    filtered_messages = []
+                    for msg in state["messages"]:
+                        if isinstance(msg, AIMessage):
+                            content_lower = msg.content.lower()
+                            # Exclude supervisor routing messages and messages with tool_calls
+                            if not any(word in content_lower for word in ["route", "current state", "force debate"]) and not hasattr(msg, "tool_calls") or not msg.tool_calls:
+                                filtered_messages.append(msg)
+                        elif isinstance(msg, HumanMessage):
+                            # Include the original query
                             filtered_messages.append(msg)
-                    elif isinstance(msg, HumanMessage):
-                        # Include the original query
-                        filtered_messages.append(msg)
-                messages_to_use = filtered_messages
+                    messages_to_use = filtered_messages
 
-            result = agents[agent_name].invoke({"messages": messages_to_use})
-            logger.info(f"Node {agent_name} complete")
+                result = agents[agent_name].invoke({"messages": messages_to_use})
+                logger.info(f"Node {agent_name} complete")
+                final_synthesis = ""
+                if agent_name == "synthesis":
+                    for msg in reversed(result["messages"]):
+                        if isinstance(msg, AIMessage) and msg.content.strip():
+                            final_synthesis = msg.content
+                            break
+
+                # Collect sources from tool outputs
+                new_sources = []
+                existing_urls = {s.get("url") for s in state.get("sources", [])}
+                for msg in result["messages"]:
+                    if hasattr(msg, "content") and isinstance(msg.content, dict) and "sources" in msg.content:
+                        for source in msg.content["sources"]:
+                            if source.get("url") and source["url"] not in existing_urls:
+                                new_sources.append(source)
+                                existing_urls.add(source["url"])
+
+                return {
+                    "messages": result["messages"],
+                    "iteration_count": state.get("iteration_count", 0) + 1,
+                    "routing_history": state.get("routing_history", []) + [agent_name],
+                    "final_synthesis": final_synthesis,
+                    "sources": state.get("sources", []) + new_sources,
+                    "last_error": None,
+                    "last_agent": agent_name
+                }
+            except Exception as e:
+                logger.error(f"Error in {agent_name}: {e}")
+                error_msg = f"Error in {agent_name}: {e}. Reflect: retry or caveats."
+                final_synthesis = error_msg if agent_name == "synthesis" else state.get("final_synthesis", "")
+                return {
+                    "messages": [SystemMessage(content=error_msg)],
+                    "iteration_count": state.get("iteration_count", 0) + 1,
+                    "routing_history": state.get("routing_history", []) + [agent_name],
+                    "final_synthesis": final_synthesis,
+                    "sources": state.get("sources", []),
+                    "last_error": error_msg,
+                    "last_agent": agent_name
+                }
+        return node
+
+    agent_nodes = {name: create_agent_node(name) for name in AGENT_NAMES}
+
+    def supervisor_node(state: AgentState) -> dict:
+        try:
+            # Add state info for supervisor visibility
+            state_info = SystemMessage(content=f"Current state: iteration_count={state.get('iteration_count', 0)}, routing_history={state.get('routing_history', [])}, debate_count={state.get('debate_count', 0)}, force_debate={state.get('force_debate', False)}")
+            current_messages = state["messages"] + [state_info]
+
+            result = supervisor_router_filtered.invoke({"messages": current_messages})
+            messages = result["messages"]
+            routes = []
+            for msg in messages:
+                if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        if tc["name"].startswith("route_to_"):
+                            routes.append(parse_route_tool(tc["name"]))
+            routes = list(set(routes))  # unique
+
+            # Loop prevention logic
+            current_iteration = state.get("iteration_count", 0) + 1
+            routing_history = state.get("routing_history", []) + routes
+
+            # Check for loops
+            if current_iteration >= config.MAX_CURRENT_ITERATION:  # Hard limit
+                routes = []
+            elif len([h for h in routing_history if h in routes]) > config.HISTORY_THRESHOLD:  # Same agent twice
+                routes = []
+
+            # Set synthesis if no routes determined
             final_synthesis = ""
-            if agent_name == "synthesis":
-                for msg in reversed(result["messages"]):
-                    if isinstance(msg, AIMessage) and msg.content.strip():
-                        final_synthesis = msg.content
-                        break
+            if not routes:
+                if messages:
+                    last_msg = messages[-1]
+                    if isinstance(last_msg, AIMessage):
+                        final_synthesis = last_msg.content
 
-            # Collect sources from tool outputs
-            new_sources = []
-            existing_urls = {s.get("url") for s in state.get("sources", [])}
-            for msg in result["messages"]:
-                if hasattr(msg, "content") and isinstance(msg.content, dict) and "sources" in msg.content:
-                    for source in msg.content["sources"]:
-                        if source.get("url") and source["url"] not in existing_urls:
-                            new_sources.append(source)
-                            existing_urls.add(source["url"])
-
+            logger.info(f"Node supervisor complete, routes: {routes}, iteration: {current_iteration}")
             return {
-                "messages": result["messages"],
-                "iteration_count": state.get("iteration_count", 0) + 1,
-                "routing_history": state.get("routing_history", []) + [agent_name],
+                "messages": operator.add(state["messages"], messages),
+                "routes": routes,
+                "iteration_count": state.get("iteration_count", 0),
+                "routing_history": routing_history,
                 "final_synthesis": final_synthesis,
-                "sources": state.get("sources", []) + new_sources,
-                "last_error": None,
-                "last_agent": agent_name
+                "sources": state.get("sources", [])
             }
         except Exception as e:
-            logger.error(f"Error in {agent_name}: {e}")
-            error_msg = f"Error in {agent_name}: {e}. Reflect: retry or caveats."
-            final_synthesis = error_msg if agent_name == "synthesis" else state.get("final_synthesis", "")
-            return {
-                "messages": [SystemMessage(content=error_msg)],
-                "iteration_count": state.get("iteration_count", 0) + 1,
-                "routing_history": state.get("routing_history", []) + [agent_name],
-                "final_synthesis": final_synthesis,
-                "sources": state.get("sources", []),
-                "last_error": error_msg,
-                "last_agent": agent_name
-            }
-    return node
+            logger.error(f"Error in supervisor: {e}")
+            return {"messages": [SystemMessage(content=f"Error in supervisor: {e}. Reflect: retry or caveats.")]}
 
-agent_nodes = {name: create_agent_node(name) for name in AGENT_NAMES}
+    # Main workflow
+    workflow = StateGraph(AgentState)
+    workflow.add_node("supervisor", supervisor_node)
+    for name in AGENT_NAMES:
+        workflow.add_node(name, agent_nodes[name])
+    if include_debate:
+        workflow.add_node("debate", debate_node)
+    workflow.add_node("remediation", remediation_node)
+
+    workflow.set_entry_point("supervisor")
+    workflow.add_conditional_edges(
+        "supervisor",
+        route_supervisor,
+        {**agent_map, "__end__": END, "END": END, "supervisor": "supervisor"}
+    )
+
+    # Conditional edges from agents: success -> supervisor, failure -> remediation
+    for name in AGENT_NAMES:
+        if name != "synthesis":
+            workflow.add_conditional_edges(name, route_agent, {"supervisor": "supervisor", "remediation": "remediation"})
+
+    if "synthesis" in AGENT_NAMES:
+        workflow.add_edge("synthesis", END)
+    if include_debate:
+        workflow.add_edge("debate", "supervisor")
+
+    # From remediation, conditional based on decision
+    workflow.add_conditional_edges("remediation", route_remediation, {**agent_map, "__end__": END, "END": END, "supervisor": "supervisor"})
+
+    app = workflow.compile()
+    return app
 
 # Debate subgraph
 def pro_node(state: AgentState) -> dict:
@@ -393,49 +446,3 @@ def remediation_node(state: AgentState) -> dict:
     except Exception as e:
         logger.error(f"Error in remediation: {e}")
         return {"messages": [SystemMessage(content=f"Error in remediation: {e}")]}
-
-# Main workflow
-workflow = StateGraph(AgentState)
-workflow.add_node("supervisor", supervisor_node)
-for name in AGENT_NAMES:
-    workflow.add_node(name, agent_nodes[name])
-workflow.add_node("debate", debate_node)
-workflow.add_node("remediation", remediation_node)
-
-workflow.set_entry_point("supervisor")
-workflow.add_conditional_edges(
-    "supervisor",
-    route_supervisor,
-    {**agent_map, "__end__": END, "END": END, "supervisor": "supervisor"}
-)
-
-# Conditional edges from agents: success -> supervisor, failure -> remediation
-for name in AGENT_NAMES:
-    if name != "synthesis":
-        workflow.add_conditional_edges(name, route_agent, {"supervisor": "supervisor", "remediation": "remediation"})
-
-workflow.add_edge("synthesis", END)
-workflow.add_edge("debate", "supervisor")
-
-# From remediation, conditional based on decision
-workflow.add_conditional_edges("remediation", route_remediation, {**agent_map, "__end__": END, "END": END, "supervisor": "supervisor"})
-
-app = workflow.compile()
-
-if __name__ == "__main__":
-    output = app.invoke({
-        "messages": [HumanMessage(content="HHI calc")],
-        "routes": [],
-        "final_synthesis": "",
-        "documents": [],
-        "iteration_count": 0,
-        "routing_history": [],
-        "sources": [],
-        "debate_round": 0,
-        "debate_count": 0,
-        "force_debate": False,
-        "last_error": None,
-        "remediation_decision": None,
-        "last_agent": ""
-    })
-    print(output["messages"][-1].content)

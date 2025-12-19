@@ -1,0 +1,6 @@
+QUERY:
+"""
+explain why Amazon-iRobot/Roombas merger was blocked? What are the arguments made by pros and cons? Why was it finally being blocked? 
+
+Debate! Use both US FTC/DoJ and EC Competition arguments.
+"""
