@@ -8,4 +8,6 @@ pypdf>=4.0.0  # PDF utils
 requests>=2.31.0
 tenacity>=8.0.0
 langchain-openai>=0.2.0
-# Note: pandoc/xelatex external; MCP tools via subprocess (no extra deps)
+tavily-python>=0.1.0
+linkup-sdk>=0.1.0
+# Note: pandoc/xelatex external; tools now use official SDKs

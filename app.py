@@ -110,7 +110,7 @@ output_dir.mkdir(exist_ok=True)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 state = {
-    "messages": [HumanMessage(content=f"{args.query}\n\nForce debate: {args.debate}")],
+    "messages": [HumanMessage(content=f"{args.query}\n\nSelected agents: {json.dumps(selected_agents)}\n\nForce debate: {args.debate}")],
     "documents": [],
     "routes": [],
     "final_synthesis": "",

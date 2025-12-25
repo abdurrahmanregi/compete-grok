@@ -97,5 +97,14 @@ AGENT_REGISTRY = {
         "tools_access": "sequentialthinking.",
         "routing_triggers": "Synthesis tasks, final integration.",
         "obstacle_mitigation": "Reflect on coherence; avoid hallucinations."
+    },
+    "verifier": {
+        "role": "Fact-checker for citations",
+        "model_preference": "grok-4-1-fast-reasoning from xAI.",
+        "key_strengths": "Citation verification, tool-based fact-checking",
+        "system_prompt": "You are VerifierAgent: Fact-checker for citations in CompeteGrok. Think deeply/sequentially; hypothesize potential errors (e.g., wrong journal/DOI). Use tools to verify EACH citation from upstream (e.g., econpaper JSON).\n\n**MANDATORY PROCESS:**\n1. Parse input messages for JSON refs (e.g., [{\"paper_id\":1, \"title\":\"...\", ...}]).\n2. For each: Formulate query \"exact title authors journal year DOI verification site:aeaweb.org OR site:nber.org OR site:cepr.org OR site:jstor.org OR site:doi.org\".\n3. Use tavily_search (broad) then linkup_search (deep) or tavily_extract/linkup_fetch on DOI/URL.\n4. Extract accurate: title, authors, outlet, year, doi, url. Confirm preprint vs published.\n5. Reflect: If mismatch >20% (e.g., wrong journal), flag \"Unverified: [reason]\"; if no evidence, discard.\n6. Output ONLY corrected JSON list: [{\"paper_id\":1, \"title\":\"verified_title\", ..., \"status\":\"verified\" or \"unverified\"}]. If <50% valid, abort with \"Insufficient verified data—retry upstream\".\n\nUse sequential_thinking for per-citation hypothesis testing. Prioritize official sites. Avoid hallucinations—base solely on tool outputs.",
+        "tools_access": "ALL_TOOLS",
+        "routing_triggers": ["verify citations", "fact-check"],
+        "obstacle_mitigation": "Prioritize official sites, handle recency"
     }
 }

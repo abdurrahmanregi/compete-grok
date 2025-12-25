@@ -23,6 +23,7 @@ DEBATE_PRO_MODEL = "grok-4-1-fast-reasoning"
 DEBATE_CON_MODEL = "grok-4-1-fast-reasoning"
 DEBATE_ARBITER_MODEL = "grok-4-1-fast-non-reasoning"
 TEAMFORMATION_MODEL = "grok-4-1-fast-reasoning"
+VERIFIER_MODEL = "grok-4-1-fast-reasoning"
 
 SAMPLING_PARAMS = {
     "default": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
@@ -41,8 +42,9 @@ RUN_CODE_R_CMD = "Rscript"
 RUN_CODE_R_ARGS = [r"C:\Users\abdur\OneDrive\Work\R-MCP\run_code_r.R"]
 RUN_CODE_R_ENV = {}
 TAVILY_CMD = "npx"
-TAVILY_ARGS = ["-y", "tavily-mcp@latest"]
+TAVILY_ARGS = ["@modelcontextprotocol/server-tavily-search"]
 TAVILY_ENV = {"TAVILY_API_KEY": TAVILY_API_KEY}
+TAVILY_MAX_RESULTS = 5
 
 LINKUP_CMD = "npx"
 LINKUP_ARGS = ["-y", "linkup-mcp-server"]
@@ -66,9 +68,9 @@ if not XAI_API_KEY:
 LOG_LEVEL = 'DEBUG' if os.getenv('VERBOSE') else 'INFO'
 
 # Maximum iterations for processing loops
-MAX_ITERATIONS = 1
+MAX_ITERATIONS = 2
 
 # Additional iteration and debate parameters
-MAX_CURRENT_ITERATION = 5
+MAX_CURRENT_ITERATION = 8
 HISTORY_THRESHOLD = 1
-DEBATE_ROUND_LIMIT = 1
+DEBATE_ROUND_LIMIT = 2

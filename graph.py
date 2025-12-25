@@ -97,7 +97,7 @@ def should_force_debate(route_data):
             any(kw in justify for kw in ["controversy", "bias", "caveat", "debate"]))
 
 ROUTER_PROMPT = SUPERVISOR_PROMPT + f"""
-You classify the query and route to appropriate agents by calling the route_to_* tools.
+You classify the query and route to the selected agents that are appropriate by calling the route_to_* tools. Do not describe routing in text; always use tool calls for routing. Prioritize routing to econpaper if selected, then verifier after econpaper if both are selected.
 
 You can call multiple route_to_* tools in parallel if multiple agents are relevant (e.g., econpaper and econquant for a query needing both research and calculation).
 
@@ -170,7 +170,7 @@ def route_remediation(state):
 
 def create_workflow(selected_agents):
     # Filter selected agents to valid ones
-    valid_agents = ["econpaper", "econquant", "explainer", "marketdef", "docanalyzer", "caselaw", "synthesis"]
+    valid_agents = ["econpaper", "econquant", "explainer", "marketdef", "docanalyzer", "caselaw", "synthesis", "verifier"]
     AGENT_NAMES = [name for name in selected_agents if name in valid_agents]
     include_debate = any(name in selected_agents for name in ["pro", "con", "arbiter"])
 
@@ -280,23 +280,38 @@ def create_workflow(selected_agents):
 
     def supervisor_node(state: AgentState) -> dict:
         try:
-            # Add state info for supervisor visibility
-            state_info = SystemMessage(content=f"Current state: iteration_count={state.get('iteration_count', 0)}, routing_history={state.get('routing_history', [])}, debate_count={state.get('debate_count', 0)}, force_debate={state.get('force_debate', False)}")
-            current_messages = state["messages"] + [state_info]
+            # Extract selected_agents from the first HumanMessage
+            selected_agents = []
+            for msg in state["messages"]:
+                if isinstance(msg, HumanMessage):
+                    content = msg.content
+                    if "Selected agents:" in content:
+                        start = content.find("Selected agents:") + len("Selected agents:")
+                        end = content.find("\n\nForce debate:")
+                        if end == -1:
+                            end = len(content)
+                        agents_str = content[start:end].strip()
+                        selected_agents = json.loads(agents_str)
+                        break
 
-            result = supervisor_router_filtered.invoke({"messages": current_messages})
-            messages = result["messages"]
-            routes = []
-            for msg in messages:
-                if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
-                    for tc in msg.tool_calls:
-                        if tc["name"].startswith("route_to_"):
-                            routes.append(parse_route_tool(tc["name"]))
-            routes = list(set(routes))  # unique
+            # Deterministic routing logic based on selected_agents and routing_history
+            routing_history = state.get("routing_history", [])
+            agents_to_route = [a for a in selected_agents if a not in ["synthesis", "verifier"] and a not in routing_history]
+            if agents_to_route:
+                routes = [agents_to_route[0]]
+            elif "verifier" in selected_agents and "verifier" not in routing_history and "econpaper" in routing_history:
+                routes = ["verifier"]
+            else:
+                routes = []
+
+            # Update routing_history
+            routing_history = routing_history + routes
+
+            # Add routing message
+            routing_msg = SystemMessage(content=f"Deterministic routes: {routes}")
 
             # Loop prevention logic
             current_iteration = state.get("iteration_count", 0) + 1
-            routing_history = state.get("routing_history", []) + routes
 
             # Check for loops
             if current_iteration >= config.MAX_CURRENT_ITERATION:  # Hard limit
@@ -307,14 +322,11 @@ def create_workflow(selected_agents):
             # Set synthesis if no routes determined
             final_synthesis = ""
             if not routes:
-                if messages:
-                    last_msg = messages[-1]
-                    if isinstance(last_msg, AIMessage):
-                        final_synthesis = last_msg.content
+                final_synthesis = "Routing complete, proceeding to synthesis."
 
             logger.info(f"Node supervisor complete, routes: {routes}, iteration: {current_iteration}")
             return {
-                "messages": operator.add(state["messages"], messages),
+                "messages": operator.add(state["messages"], [routing_msg]),
                 "routes": routes,
                 "iteration_count": state.get("iteration_count", 0),
                 "routing_history": routing_history,
