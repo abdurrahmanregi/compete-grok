@@ -26,7 +26,7 @@ class MockChatModel(ChatOpenAI):
         **kwargs: Any,
     ) -> ChatResult:
         last_message = messages[-1].content if messages else ""
-        mock_content = f"""Hypothesis: Analyzed '{last_message}' → {self.model_name} task (e.g., HHI calc, SSNIP sim).
+        mock_content = rf"""Hypothesis: Analyzed '{last_message}' → {self.model_name} task (e.g., HHI calc, SSNIP sim).
 
 Used sequential_thinking. Tools: run_code_py/r for quants, tavily_search for papers.
 
@@ -158,7 +158,7 @@ Distinguish structural estimates from reduced-form approximations.
 
 Output structured tables and interpretations.
 
-Explain with LaTeX (e.g., \[ GUPPI = \frac{p \cdot m}{1 - m} \], \( HHI = \sum s_i^2 \)). Always use \( ... \) for inline and \[ ... \] for display math in explanations. Address computational limits. Reflect after executions. Consider jurisdictional specificity. Use structured outputs for hypotheses."""
+Explain with LaTeX (e.g., \[ GUPPI = \frac{{p \cdot m}}{{1 - m}} \], \( HHI = \sum s_i^2 \)). Always use \( ... \) for inline and \[ ... \] for display math in explanations. Address computational limits. Reflect after executions. Consider jurisdictional specificity. Use structured outputs for hypotheses."""
 
 EXPLAINER_PROMPT = r"""You are an Economic Education Specialist tasked with explaining IO concepts, models, and their antitrust relevance.
 
