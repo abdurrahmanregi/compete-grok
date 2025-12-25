@@ -11,26 +11,26 @@ LINKUP_API_KEY = os.getenv('LINKUP_API_KEY')
 # Models from AGENTS.md
 SUPERVISOR_MODEL = "grok-4-1-fast-reasoning"
 ECONPAPER_MODEL = "grok-4-1-fast-reasoning"
-ECONQUANT_MODEL = "grok-4-0709"
-EXPLAINER_MODEL = "grok-4-0709"
+ECONQUANT_MODEL = "grok-4-1-fast-reasoning"
+EXPLAINER_MODEL = "grok-4-1-fast-reasoning"
 MARKETDEF_MODEL = "grok-4-1-fast-reasoning"
-DOCANALYZER_MODEL = "grok-4-1-fast-non-reasoning"
+DOCANALYZER_MODEL = "grok-4-1-fast-reasoning"
 CASELAW_MODEL = "grok-4-1-fast-reasoning"
 SYNTHESIS_MODEL = "grok-4-1-fast-non-reasoning"
-REMEDIATION_MODEL = "grok-4-1-fast-reasoning"
+REMEDIATION_MODEL = "grok-4-1-fast-non-reasoning"
 # Debate Module Agents
-DEBATE_PRO_MODEL = "grok-4-0709"
-DEBATE_CON_MODEL = "grok-4-0709"
+DEBATE_PRO_MODEL = "grok-4-1-fast-reasoning"
+DEBATE_CON_MODEL = "grok-4-1-fast-reasoning"
 DEBATE_ARBITER_MODEL = "grok-4-1-fast-non-reasoning"
 TEAMFORMATION_MODEL = "grok-4-1-fast-reasoning"
 
 SAMPLING_PARAMS = {
-    "default": {"temperature": 0.5, "top_p": 0.95, "extra_body": {"top_k": 20}},
+    "default": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
     "econquant": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
     # "supervisor": {"temperature": 0.5, "top_p": 0.95, "max_tokens": 65536, "extra_body": {"top_k": 20}},
     # "synthesis": {"temperature": 0.6, "top_p": 0.95, "max_tokens": 65536, "extra_body": {"top_k": 20}}
-    "supervisor": {"temperature": 0.6, "top_p": 0.95, "extra_body": {"top_k": 20}},
-    "synthesis": {"temperature": 0.7, "top_p": 0.95, "extra_body": {"top_k": 20}}
+    "supervisor": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
+    "synthesis": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}}
 }
 
 # MCP Paths

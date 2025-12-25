@@ -1,1 +1,0 @@
-explain BLP demand estimation. step by step.

@@ -1,1 +1,0 @@
-Explain nested logit model step-by-step with LaTeX derivations and IIA-like caveats.
