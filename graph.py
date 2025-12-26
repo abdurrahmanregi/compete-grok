@@ -299,7 +299,7 @@ def create_workflow(selected_agents):
             agents_to_route = [a for a in selected_agents if a not in ["synthesis", "verifier", "pro", "con", "arbiter"] and a not in routing_history]
             if agents_to_route:
                 routes = [agents_to_route[0]]
-            elif "verifier" in selected_agents and "verifier" not in routing_history and "econpaper" in routing_history:
+            elif "verifier" in selected_agents and "verifier" not in routing_history and ("econpaper" in routing_history or "caselaw" in routing_history):
                 routes = ["verifier"]
             elif state.get("force_debate", False) and any(name in selected_agents for name in ["pro", "con", "arbiter"]):
                 routes = ["debate"]
