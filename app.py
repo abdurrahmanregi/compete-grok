@@ -98,7 +98,7 @@ if args.query.endswith('.txt'):
 
 # Run TeamFormationAgent to select agents
 logger.info("Running TeamFormationAgent...")
-team_result = agents["teamformation"].invoke({"messages": [HumanMessage(content=args.query)]})
+team_result = agents["teamformation"].invoke({"messages": [HumanMessage(content=f"{args.query}\n\nForce debate: {args.debate}")]})
 selected_agents = json.loads(team_result["messages"][-1].content)
 logger.info(f"Selected agents: {selected_agents}")
 
@@ -172,11 +172,11 @@ if sources:
         report_content += f"{i}. {title} - {url}\n"
     report_content += "\n"
 
-report_content += """
-**Privacy:** Ephemeral RAG; zero retention.
-**Disclaimer:** Not legal advice. Models have caveats (e.g. IIA assumption). Verify 2025 data.
-**LaTeX:** Inline $x$, display $$E=mc^2$$.
-"""
+# report_content += """
+# **Privacy:** Ephemeral RAG; zero retention.
+# **Disclaimer:** Not legal advice. Models have caveats (e.g. IIA assumption). Verify 2025 data.
+# **LaTeX:** Inline $x$, display $$E=mc^2$$.
+# """
 
 md_path = output_dir / f"report_{timestamp}.md"
 with open(md_path, "w", encoding="utf-8") as f:

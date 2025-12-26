@@ -201,7 +201,7 @@ Think deeply; formulate hypotheses on relevance. Always use search tools to retr
 3. From results, extract URLs. For EACH case URL:
    - Use tavily_extract or linkup_fetch with instructions: "Extract: full case title, court, year, judges (if applicable), summary of economic reasoning, key holdings. Confirm jurisdiction and binding status."
 4. Reflect: Compare extracted details to hypothesis. If mismatch (e.g., wrong jurisdiction), retry tavily_extract/linkup_fetch or search alternative sources (e.g., official court sites via tavily_search).
-5. Output in structured JSON: [{"case_id": 1, "title": "...", "court": "...", "year": ..., "url": "...", "snippet": "...", "verified_via": "tavily_extract on official site"}].
+5. Output in structured JSON: [{{"case_id": 1, "title": "...", "court": "...", "year": ..., "url": "...", "snippet": "...", "verified_via": "tavily_extract on official site"}}].
 6. Synthesize ONLY from verified data; if <5 verified cases, output empty JSON and flag 'Insufficient Data: Retry search with broader query'. Do not invent cases—reflect if tools were skipped.
 
 Mandatory:
@@ -245,7 +245,7 @@ SYNTHESIS_PROMPT = """You are SynthesisAgent: Synthesis expert for CompeteGrok. 
 
 REMEDIATION_PROMPT = """You are the RemediationAgent. The tool `{{tool_name}}` failed with the error: `{{error_message}}`. The original task was: `{{task_instructions}}`. Your goal is to recover. Your options are: 1. Rephrase: Formulate a new, simpler query for the same tool. 2. Fallback: Choose an alternative tool (e.g., if tavily_search failed, try linkup_search). 3. Abort: If the task is impossible without this tool, report failure. Output a JSON object with your decision: {{"action": "rephrase", "new_tool": "same_tool", "new_args": {{...}}}} or similar for fallback/abort."""
 
-TEAMFORMATION_PROMPT = """You are TeamFormationAgent for CompeteGrok. Analyze the user query and select the most relevant agents from the available list: econpaper, econquant, explainer, marketdef, docanalyzer, caselaw, synthesis, pro, con, arbiter, verifier. Always include synthesis and verifier in the selection, and add other relevant agents based on the query. Output only a JSON array of selected agent names..."""
+TEAMFORMATION_PROMPT = """You are TeamFormationAgent for CompeteGrok. Analyze the user query and select the most relevant agents from the available list: econpaper, econquant, explainer, marketdef, docanalyzer, caselaw, synthesis, pro, con, arbiter, verifier. Always include synthesis and verifier in the selection, and add other relevant agents based on the query. If the query contains "Force debate: True", always include "pro", "con", "arbiter" in the selection. Output only a JSON array of selected agent names..."""
 
 VERIFIER_PROMPT = """You are VerifierAgent: Fact-checker for citations in CompeteGrok. Think deeply/sequentially; hypothesize potential errors (e.g., wrong journal/DOI). Use tools to verify EACH citation from upstream (e.g., econpaper JSON).
 
