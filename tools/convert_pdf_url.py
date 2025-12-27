@@ -1,32 +1,36 @@
 from langchain_core.tools import tool
-import subprocess
-import json
 import os
-from config import *
+import base64
+import requests
+from dotenv import load_dotenv
+from mistralai import Mistral
+
+load_dotenv()
+api_key = os.getenv("MISTRAL_API_KEY")
+if not api_key:
+    raise ValueError("MISTRAL_API_KEY not found in .env")
+client = Mistral(api_key=api_key)
 
 @tool
 def convert_pdf_url(url: str) -> str:
-    """Convert PDF from URL to Markdown."""
-    input_data = {"url": url}
-    cmd = [PDF2MD_CMD] + PDF2MD_ARGS
-    env = os.environ.copy()
-    env.update(PDF2MD_ENV)
+    """Convert a PDF from a URL to Markdown using Mistral OCR API directly."""
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env,
-            text=True,
-            encoding='utf-8'
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        pdf_bytes = response.content
+        b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+        ocr_response = client.ocr.process(
+            model="mistral-ocr-latest",
+            document={
+                "type": "document_url",
+                "document_url": f"data:application/pdf;base64,{b64_pdf}"
+            },
+            table_format="markdown"
         )
-        json_input = json.dumps({"input": input_data})
-        stdout, stderr = proc.communicate(input=json_input, timeout=180)
-        proc.wait()
-        if proc.returncode != 0:
-            raise Exception(f"Return code {proc.returncode}: {stderr}")
-        result = json.loads(stdout or "{}")
-        return result.get("content", str(result))
+        md_pages = [page.markdown for page in ocr_response.pages]
+        md_content = "\n\n---\n\n".join(md_pages)
+        return md_content
+    except requests.RequestException as e:
+        return f"Download error for {url}: {str(e)}"
     except Exception as e:
-        return f"Mock convert_pdf_url('{url}'): Converted to C:/Users/abdur/Downloads/file.md\n# Econ Paper\n## Abstract\nIO analysis... Note: MISTRAL_API_KEY required. Error: {str(e)[:300]}"
+        return f"OCR error for {url}: {str(e)}"

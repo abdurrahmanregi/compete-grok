@@ -54,9 +54,6 @@ SEQUENTIAL_CMD = "npx"
 SEQUENTIAL_ARGS = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
 SEQUENTIAL_ENV = {}
 
-PDF2MD_CMD = "uv"
-PDF2MD_ARGS = ["--directory", r"C:\Users\abdur\OneDrive\Work\mcp-pdf2md", "run", "pdf2md", "--output-dir", r"C:\Users\abdur\OneDrive\Work\compete-grok\inputs\pdfs"]
-PDF2MD_ENV = {"MISTRAL_API_KEY": MISTRAL_API_KEY}
 
 FILESYSTEM_CMD = "npx"
 FILESYSTEM_ARGS = ["@modelcontextprotocol/server-filesystem", "-y", r"C:\Users\abdur\OneDrive\Work\compete-grok"]

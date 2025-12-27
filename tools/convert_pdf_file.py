@@ -1,32 +1,36 @@
 from langchain_core.tools import tool
-import subprocess
-import json
 import os
-from config import *
+import base64
+from dotenv import load_dotenv
+from mistralai import Mistral
+
+load_dotenv()
+api_key = os.getenv("MISTRAL_API_KEY")
+if not api_key:
+    raise ValueError("MISTRAL_API_KEY not found in .env")
+client = Mistral(api_key=api_key)
 
 @tool
 def convert_pdf_file(file_path: str) -> str:
-    """Convert local PDF file to Markdown."""
-    input_data = {"file_path": file_path}
-    cmd = [PDF2MD_CMD] + PDF2MD_ARGS
-    env = os.environ.copy()
-    env.update(PDF2MD_ENV)
+    """Convert a local PDF file to Markdown using Mistral OCR API directly."""
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env,
-            text=True,
-            encoding='utf-8'
+        if not os.path.isfile(file_path):
+            return f"File not found or not a file: {file_path}"
+        with open(file_path, 'rb') as f:
+            pdf_bytes = f.read()
+        if not pdf_bytes.startswith(b'%PDF'):
+            return f"Invalid PDF file: {file_path}"
+        b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+        ocr_response = client.ocr.process(
+            model="mistral-ocr-latest",
+            document={
+                "type": "document_url",
+                "document_url": f"data:application/pdf;base64,{b64_pdf}"
+            },
+            table_format="markdown"
         )
-        json_input = json.dumps({"input": input_data})
-        stdout, stderr = proc.communicate(input=json_input, timeout=180)
-        proc.wait()
-        if proc.returncode != 0:
-            raise Exception(f"Return code {proc.returncode}: {stderr}")
-        result = json.loads(stdout or "{}")
-        return result.get("content", str(result))
+        md_pages = [page.markdown for page in ocr_response.pages]
+        md_content = "\n\n---\n\n".join(md_pages)
+        return md_content
     except Exception as e:
-        return f"Mock convert_pdf_file('{file_path}'): Converted to folder/file.md\n# Local Econ Doc\nContent extracted... Note: MISTRAL_API_KEY required. Error: {str(e)[:300]}"
+        return f"OCR error for {file_path}: {str(e)}"
