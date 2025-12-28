@@ -44,7 +44,7 @@ RUN_CODE_R_ENV = {}
 TAVILY_CMD = "npx"
 TAVILY_ARGS = ["@modelcontextprotocol/server-tavily-search"]
 TAVILY_ENV = {"TAVILY_API_KEY": TAVILY_API_KEY}
-TAVILY_MAX_RESULTS = 5
+TAVILY_MAX_RESULTS = 10
 
 LINKUP_CMD = "npx"
 LINKUP_ARGS = ["-y", "linkup-mcp-server"]

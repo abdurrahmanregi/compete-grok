@@ -10,7 +10,8 @@ def tavily_search(query: str, time_range: str = "year") -> dict:
         client = TavilyClient(api_key=TAVILY_API_KEY)
         response = client.search(
             query=query,
-            search_depth="basic",
+            # search_depth="basic",
+            search_depth="advanced",
             max_results=TAVILY_MAX_RESULTS,
             time_range=time_range
         )
