@@ -2,6 +2,10 @@
 
 CompeteGrok is an AI-powered system for Industrial Organization (IO) economics and competition law analysis. It uses a multi-agent architecture orchestrated by LangGraph to provide comprehensive, evidence-based insights on complex economic and legal queries.
 
+## Project Overview
+
+CompeteGrok is designed to assist in antitrust and competition economics analysis by leveraging specialized AI agents. It adheres to governing principles including jurisdictional specificity (defaulting to US FTC/DOJ and EU Competition guidelines), declaration of legal standards (e.g., Consumer Welfare Standard), distinction between positive and normative statements, evidence hierarchy (binding case law, peer-reviewed studies, etc.), structured outputs, and hypothesis-driven reasoning. For detailed agent definitions and prompts, refer to AGENTS.md.
+
 ## Key Features
 
 - **Multi-Agent Orchestration**: Specialized agents for research, quantitative analysis, explanations, market definitions, document analysis, case law, and debates.
@@ -22,6 +26,19 @@ CompeteGrok leverages LangGraph for workflow orchestration:
 - **State Management**: TypedDict-based tracking of iterations, routing history, sources, and errors to prevent loops.
 
 Workflow: Query → Classification → Agent Routing → Execution → Debate (if needed) → Synthesis → Report Generation.
+
+## Agent Workflows
+
+Agents follow hypothesis-driven workflows tailored to their roles:
+- **Economic Research**: Search and synthesize papers using tools like tavily_search and linkup_search.
+- **Quantitative Analysis**: Perform calculations (e.g., HHI, GUPPI) with run_code_py/r.
+- **Explanation**: Break down models with caveats and LaTeX derivations.
+- **Market Definition**: Apply SSNIP tests under jurisdictional guidelines.
+- **Document Analysis**: Process uploads via PDF conversion and reading tools.
+- **Case Law**: Search and verify precedents.
+- **Debate**: Pro/con arguments with arbiter synthesis.
+- **Synthesis**: Integrate results into final reports.
+For detailed prompts and routing triggers, see AGENTS.md.
 
 ## Installation and Setup
 
@@ -123,6 +140,17 @@ python app.py --query "Calculate HHI for a market with firms of sizes 30%, 25%, 
 
 For detailed prompts and routing, see `AGENTS.md`.
 
+## Contribution Guidelines
+
+We welcome contributions to CompeteGrok! To contribute:
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/YourFeature`).
+3. Commit your changes (`git commit -m 'Add YourFeature'`).
+4. Push to the branch (`git push origin feature/YourFeature`).
+5. Open a Pull Request.
+
+Please ensure your code follows Python best practices, includes docstrings, and passes tests. For major changes, open an issue first to discuss. See AGENTS.md for agent-specific guidelines.
+
 ## Governing Principles
 
 - **Jurisdictional Specificity**: Considers relevant jurisdictions (e.g., US FTC/DOJ, EU Competition) and guidelines.
@@ -145,4 +173,27 @@ For detailed prompts and routing, see `AGENTS.md`.
 - Troubleshooting: Check logs; ensure API keys and tools are configured.
 
 For more details, refer to `AGENTS.md`.
+
+## Change Log
+
+### Recent Improvements
+- Step 1: Initial analysis and planning of core architecture.
+- Step 2: Implementation of multi-agent orchestration using LangGraph.
+- Step 3: Integration of MCP tools for search, code execution, and PDF processing.
+- Step 4: Development of specialized agents with hypothesis-driven prompts.
+- Step 5: Addition of debate subgraph for balanced analysis.
+- Step 6: Incorporation of error handling, remediation, and verification agents.
+
+### Runtime Fixes
+- Added advanced logging in [`compete_logging.py`](compete_logging.py).
+- Fixed SDK alignments in tools/ directory for consistent API integrations.
+- Resolved runtime errors in agent routing and tool executions.
+- Implemented loop prevention and state management fixes as documented in [`loop_prevention_fixes.md`](loop_prevention_fixes.md).
+- End-to-end tested with sample queries like [`query_01.txt`](inputs/query_01.txt).
+
+### Current State
+- Enhanced modularity with dynamic agent composition and extensible tools.
+- Achieved 54% test coverage across key components.
+- Project runs error-free in standard configurations.
+- Key files added/updated: [`AGENTS.md`](AGENTS.md), [`graph.py`](graph.py), [`debate.py`](debate.py), [`compete_logging.py`](compete_logging.py), and various agents in agents/ directory.
 

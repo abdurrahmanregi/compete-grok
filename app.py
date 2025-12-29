@@ -1,3 +1,10 @@
+"""CompeteGrok CLI Application.
+
+This module provides the command-line interface for running CompeteGrok,
+an AI-powered system for antitrust analysis. It handles query processing,
+agent orchestration, and report generation.
+"""
+
 import argparse
 import os
 import subprocess
@@ -13,7 +20,8 @@ import logging
 import json
 
 from dotenv import load_dotenv; load_dotenv()
-from agents.agents import agents
+from agents import agents
+from exceptions import WorkflowError, AgentError, FileProcessingError
 
 def fix_md_math(md_path: str) -> str:
     """Fixes LaTeX math block indentation in Markdown files for Pandoc compatibility.
@@ -32,6 +40,7 @@ def fix_md_math(md_path: str) -> str:
         FileNotFoundError: If the input file does not exist.
         IOError: If there are issues reading from or writing to files.
     """
+    # Read the input Markdown file
     with open(md_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
@@ -66,6 +75,7 @@ def fix_md_math(md_path: str) -> str:
     return fixed_path
  
 
+# Set up command-line argument parser
 parser = argparse.ArgumentParser(description="CompeteGrok: IO Economics AI")
 parser.add_argument("--query", type=str, required=True, help="Query text or path to .txt file (multi-line)")
 parser.add_argument("--file", type=str, nargs="*", help="PDF/Excel uploads for RAG")
@@ -90,6 +100,7 @@ if not os.path.isdir(args.output_dir):
     except OSError as e:
         parser.error(f"Cannot create output directory: {e}")
 
+# Configure logging based on arguments
 log_level = getattr(logging, args.log_level or ('DEBUG' if args.verbose else 'INFO'))
 logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
@@ -145,19 +156,35 @@ if args.query.endswith('.txt'):
     else:
         raise ValueError(f"Query file not found: {args.query}")
 
-# Run TeamFormationAgent to select agents
+# Run TeamFormationAgent to select agents based on query
 logger.info("Running TeamFormationAgent...")
-team_result = agents["teamformation"].invoke({"messages": [HumanMessage(content=f"{args.query}\n\nForce debate: {args.debate}")]})
-selected_agents = json.loads(team_result["messages"][-1].content)
-logger.info(f"Selected agents: {selected_agents}")
+try:
+    team_result = agents["teamformation"].invoke({"messages": [HumanMessage(content=f"{args.query}\n\nForce debate: {args.debate}")]})
+    selected_agents = json.loads(team_result["messages"][-1].content)
+    logger.info("Selected agents: %s", selected_agents)
+except json.JSONDecodeError as e:
+    logger.error("Failed to parse teamformation output: %s", str(e), exc_info=True)
+    raise AgentError(f"TeamFormation agent output parsing failed: {e}") from e
+except Exception as e:
+    logger.error("Error in TeamFormationAgent: %s", str(e), exc_info=True)
+    raise AgentError(f"TeamFormation agent failed: {e}") from e
 
 # Create workflow with selected agents
-workflow = create_workflow(selected_agents)
+try:
+    workflow = create_workflow(selected_agents)
+except WorkflowError as e:
+    logger.error("Workflow creation failed: %s", str(e), exc_info=True)
+    raise
+except Exception as e:
+    logger.error("Unexpected error creating workflow: %s", str(e), exc_info=True)
+    raise WorkflowError(f"Unexpected workflow creation error: {e}") from e
 
+# Prepare output directory and timestamp
 output_dir = Path(args.output_dir)
 output_dir.mkdir(exist_ok=True)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+# Initialize state dictionary for workflow
 state = {
     "messages": [HumanMessage(content=f"{args.query}\n\nSelected agents: {json.dumps(selected_agents)}\n\nForce debate: {args.debate}")],
     "documents": [],
@@ -171,6 +198,7 @@ state = {
     "debate_count": 0,
 }
 
+# Process uploaded files if provided
 if args.file:
     for file_path in args.file:
         if args.verbose: print(f"Processing upload: {file_path}")
@@ -184,6 +212,7 @@ if args.file:
         except (OSError, ValueError) as e:
             logger.warning(f"Upload error: {e}")
 
+# Invoke the workflow with the prepared state
 logger.info("Invoking workflow...")
 try:
     # raise ValueError("Simulated workflow error")  # Uncomment to test
@@ -240,10 +269,17 @@ if sources:
 # **LaTeX:** Inline $x$, display $$E=mc^2$$.
 # """
 
+# Write the report to Markdown file
 md_path = output_dir / f"report_{timestamp}.md"
-with open(md_path, "w", encoding="utf-8") as f:
-    f.write(report_content)
+try:
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+    logger.info("Report written to %s", md_path)
+except (OSError, IOError) as e:
+    logger.error("Failed to write report to %s: %s", md_path, str(e), exc_info=True)
+    raise FileProcessingError(f"Report writing failed: {e}") from e
 
+# Fix LaTeX math blocks for Pandoc compatibility
 try:
     fixed_md_path = fix_md_math(str(md_path))
     logger.info(f"MD math fixed successfully: {fixed_md_path}")

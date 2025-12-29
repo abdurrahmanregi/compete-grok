@@ -2,7 +2,10 @@ from langchain_core.tools import tool
 import subprocess
 import json
 import os
+import logging
 from config import *
+
+logger = logging.getLogger(__name__)
 
 @tool
 def run_code_r(code: str) -> str:
@@ -29,4 +32,5 @@ def run_code_r(code: str) -> str:
         result = json.loads(stdout or "{}")
         return result.get("result", result.get("content", str(result)))
     except Exception as e:
+        logger.error(f"Error in run_code_r: {e}")  # Log subprocess or execution errors for debugging
         return f"Mock (MCP ready?): R HHI example: sum(sapply(c(0.4,0.3), function(s) s^2)) * 10000 = 2500. Note: Check env. Error: {str(e)[:300]}"

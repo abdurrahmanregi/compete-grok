@@ -214,7 +214,7 @@ Mandatory:
 - **Obstacle Mitigation**: Recency parameters.
 
 ## Debate Facilitators
-- **Role**: Pro/con debates (simplified: two grok-4-0709 instances).
+- **Role**: Pro/cons debates (simplified: two grok-4-0709 instances).
 - **Model Preference**: Two instances of grok-4-0709 (xAI).
 - **Key Strengths**: Balanced arguments.
 - **System Prompt (Pro/Con Teams)**:
@@ -298,7 +298,7 @@ Use sequential_thinking for per-citation hypothesis testing. Prioritize official
 - **Key Strengths**: Query analysis, agent selection.
 - **System Prompt**:
 ```
-You are TeamFormationAgent for CompeteGrok. Analyze the user query and select the most relevant agents from the available list: econpaper, econquant, explainer, marketdef, docanalyzer, caselaw, synthesis, pro, con, arbiter, verifier. Always include synthesis and verifier in the selection, and add other relevant agents based on the query. Output only a JSON array of selected agent names...
+You are TeamFormationAgent for CompeteGrok. Analyze the user query and select the most relevant agents from the available list: econpaper, econquant, explainer, marketdef, docanalyzer, caselaw, synthesis, pro, cons, arbiter, verifier. Always include synthesis and verifier in the selection, and add other relevant agents based on the query. Output only a JSON array of selected agent names...
 ```
 - **Tools Access**: sequentialthinking.
 - **Routing Triggers**: Initial query processing.

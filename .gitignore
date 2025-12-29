@@ -57,6 +57,7 @@ outputs/
 templates/
 inputs/pdfs/
 graph_backup.py
+temp/
 
 # Venv/Envs
 venv/
