@@ -1,6 +1,7 @@
 import argparse
 import os
 import subprocess
+import shlex
 from datetime import datetime
 from pathlib import Path
 from langchain_core.messages import HumanMessage, AIMessage
@@ -14,32 +15,50 @@ import json
 from dotenv import load_dotenv; load_dotenv()
 from agents.agents import agents
 
-def fix_md_math(md_path):
+def fix_md_math(md_path: str) -> str:
+    """Fixes LaTeX math block indentation in Markdown files for Pandoc compatibility.
+
+    Processes the input Markdown file to dedent LaTeX math blocks (delimited by
+    \\[ ... \\] or $$ ... $$) that may have been indented, which can cause Pandoc
+    to fail rendering them as math. Creates a new file with '_fixed' suffix.
+
+    Args:
+        md_path (str): Path to the input Markdown file.
+
+    Returns:
+        str: Path to the fixed Markdown file with dedented math blocks.
+
+    Raises:
+        FileNotFoundError: If the input file does not exist.
+        IOError: If there are issues reading from or writing to files.
+    """
     with open(md_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-    
+
     fixed_lines = []
     i = 0
     while i < len(lines):
         line = lines[i].rstrip('\n')
+        # Check for start of LaTeX math block (either \[ or $$ with optional leading whitespace)
         if re.match(r'^\s*(?:\\\[|$$)', line):
             # Start of math block
             block = [line]
             i += 1
+            # Collect all lines until the end of the math block
             while i < len(lines) and not re.match(r'^\s*(?:\\]|$$)', lines[i].rstrip('\n')):
                 block.append(lines[i].rstrip('\n'))
                 i += 1
             if i < len(lines):
                 block.append(lines[i].rstrip('\n'))
                 i += 1
-            # Dedent block
+            # Dedent the entire block to remove any common leading whitespace
             block_text = '\n'.join(block) + '\n'
             dedented = textwrap.dedent(block_text)
             fixed_lines.extend(dedented.splitlines(keepends=True))
         else:
             fixed_lines.append(lines[i])
             i += 1
-    
+
     fixed_content = ''.join(fixed_lines)
     fixed_path = md_path.replace('.md', '_fixed.md')
     with open(fixed_path, 'w', encoding='utf-8') as f:
@@ -51,46 +70,76 @@ parser = argparse.ArgumentParser(description="CompeteGrok: IO Economics AI")
 parser.add_argument("--query", type=str, required=True, help="Query text or path to .txt file (multi-line)")
 parser.add_argument("--file", type=str, nargs="*", help="PDF/Excel uploads for RAG")
 parser.add_argument("--verbose", action="store_true", help="Verbose output")
+parser.add_argument("--log-level", type=str, default=None, choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Set logging level")
 parser.add_argument("--output-dir", type=str, default="./outputs", help="Output dir")
 parser.add_argument("--debate", action="store_true", help="Force debate module regardless of supervisor routing")
 args = parser.parse_args()
 
-logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+# Validate user inputs
+if not args.query or not args.query.strip():
+    parser.error("Query cannot be empty.")
+
+if args.file:
+    for file_path in args.file:
+        if not os.path.isfile(file_path):
+            parser.error(f"File does not exist: {file_path}")
+
+if not os.path.isdir(args.output_dir):
+    try:
+        os.makedirs(args.output_dir, exist_ok=True)
+    except OSError as e:
+        parser.error(f"Cannot create output directory: {e}")
+
+log_level = getattr(logging, args.log_level or ('DEBUG' if args.verbose else 'INFO'))
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
 
+# If query argument ends with .txt, treat it as a file path and parse it
 if args.query.endswith('.txt'):
     query_path = Path(args.query)
     if query_path.exists():
+        # Read the entire file content and strip whitespace
         content = query_path.read_text(encoding="utf-8").strip()
+        # Remove surrounding triple quotes if present (for multi-line strings)
         if content.startswith('"""') and content.endswith('"""'):
             content = content[3:-3].strip()
+        # Split content into lines for section-based parsing
         lines = content.splitlines()
         query_text = ""
         file_paths = []
         in_query = False
         in_files = False
+        # Parse lines to extract QUERY and FILES sections
         for line in lines:
             line = line.strip()
+            # Start of QUERY section
             if line.upper() == "QUERY:":
                 in_query = True
                 in_files = False
                 continue
+            # Start of FILES section
             elif line.upper() == "FILES:":
                 in_files = True
                 in_query = False
                 continue
+            # Append to query text if in QUERY section
             if in_query:
                 query_text += line + "\n"
+            # Append to file paths if in FILES section and line is not empty
             elif in_files and line:
                 file_paths.append(line)
+        # If no QUERY section found, use entire content as query
         if not query_text.strip():
             query_text = content
+        # Update args.query with parsed query text
         args.query = query_text.strip()
+        # Update args.file with parsed file paths if any
         if file_paths:
             if args.file is None:
                 args.file = file_paths
             else:
                 args.file.extend(file_paths)
+        # Log the file loading if verbose mode
         if args.verbose:
             print(f"Loaded and parsed query from file: {query_path}")
     else:
@@ -127,31 +176,44 @@ if args.file:
         if args.verbose: print(f"Processing upload: {file_path}")
         try:
             md_content = convert_pdf_file(file_path)
-            state["documents"].append(md_content)
-        except Exception as e:
+            if md_content.startswith(("File not found", "Invalid PDF", "OCR error")):
+                logger.warning(f"Upload processing failed: {md_content}")
+            else:
+                state["documents"].append(md_content)
+                logger.info(f"Successfully processed upload: {file_path}")
+        except (OSError, ValueError) as e:
             logger.warning(f"Upload error: {e}")
 
 logger.info("Invoking workflow...")
 try:
+    # raise ValueError("Simulated workflow error")  # Uncomment to test
     result = workflow.invoke(state)
-    logger.info("Workflow complete")
-except Exception as e:
+    logger.info("Workflow invoked successfully")
+except (ValueError, KeyError, RuntimeError, TypeError) as e:
     logger.error(f"Workflow invoke error: {e}")
     result = {
         "messages": state["messages"] + [AIMessage(content=f"**Error:** {str(e)}\nReflected: See caveats.")],
         "final_synthesis": f"Error occurred: {e}. Reflection: Check logs/caveats.",
         "routes": getattr(state, "routes", [])
     }
+except Exception as e:
+    logger.error(f"Unexpected workflow invoke error: {e}")
+    result = {
+        "messages": state["messages"] + [AIMessage(content=f"**Unexpected Error:** {str(e)}\nReflected: See caveats.")],
+        "final_synthesis": f"Unexpected error occurred: {e}. Reflection: Check logs/caveats.",
+        "routes": getattr(state, "routes", [])
+    }
 
 if args.verbose:
     logger.debug(f"Workflow result: {result}")
 
-# Extract report: final_synthesis
+# Generate the report content in Markdown format
 report_content = "# CompeteGrok Analysis Report\n\n"
 report_content += f"**Query:** {args.query}\n\n"
 report_content += f"**Selected Agents:** {selected_agents}\n\n"
 report_content += f"**Timestamp:** {datetime.now()}\n\n"
 report_content += f"**Routes:** {result.get('routes', 'N/A')}\n\n"
+# Retrieve final synthesis from result, fallback to last message content if not present
 final_synth = result.get("final_synthesis")
 if not final_synth:
     # Use the last AIMessage content if no final_synthesis
@@ -162,7 +224,7 @@ if not final_synth:
             break
 report_content += (final_synth or "No synthesis available.") + "\n\n"
 
-# Append References
+# Append References section if sources are available
 sources = result.get("sources", [])
 if sources:
     report_content += "### References\n"
@@ -184,26 +246,34 @@ with open(md_path, "w", encoding="utf-8") as f:
 
 try:
     fixed_md_path = fix_md_math(str(md_path))
-except Exception as e:
+    logger.info(f"MD math fixed successfully: {fixed_md_path}")
+except (FileNotFoundError, OSError) as e:
     logger.warning(f"MD preprocess failed: {e}. Using original MD.")
     fixed_md_path = str(md_path)
+except Exception as e:
+    logger.warning(f"Unexpected MD preprocess error: {e}. Using original MD.")
+    fixed_md_path = str(md_path)
 
-pdf_path = md_path.with_suffix(".pdf")
+# Ensure paths use forward slashes for pandoc compatibility
+fixed_md_path = fixed_md_path.replace('\\', '/')
+pdf_path = str(md_path.with_suffix(".pdf")).replace('\\', '/')
+
+# Convert the fixed Markdown to PDF using Pandoc with XeLaTeX engine for math rendering
 try:
     subprocess.run([
-        "pandoc", fixed_md_path, "-o", str(pdf_path),
+        "pandoc", fixed_md_path, "-o", pdf_path,
         "-f", "markdown+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash",
         "--pdf-engine=xelatex",
         "--variable", "header-includes:\\usepackage{amsmath}\\usepackage{amssymb}\\usepackage{geometry}\\geometry{margin=1in}",
         "--variable", "fontsize=11pt",
         "--variable", "mainfont=Arial",  # LaTeX compat
     ], check=True, capture_output=True)
-    logger.info(f"✅ Generated:\n{md_path}\n{pdf_path}")
+    logger.info(f"PDF generated successfully: {pdf_path}")
 except subprocess.CalledProcessError as e:
     stderr_msg = e.stderr.decode('utf-8', errors='ignore') if e.stderr else str(e)
-    logger.error(f"❌ PDF failed: {stderr_msg}. MD ready: {md_path}")
+    logger.error(f"PDF generation failed: {stderr_msg}. MD available: {md_path}")
 except FileNotFoundError:
-    logger.error(f"❌ Pandoc not found. Install: https://pandoc.org/. MD: {md_path}")
+    logger.error(f"Pandoc not found. Install from https://pandoc.org/. MD available: {md_path}")
 
 if args.verbose:
     logger.info("Done.")

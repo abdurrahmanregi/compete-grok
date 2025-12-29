@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, Sequence, Optional
+from typing import TypedDict, Annotated, Sequence, Optional, Any
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 import operator
@@ -10,14 +10,15 @@ from langchain_core.messages import SystemMessage
 logger = logging.getLogger(__name__)
 
 from agents.agents import (
-    create_agent, 
-    SUPERVISOR_PROMPT, 
-    SUPERVISOR_MODEL, 
+    create_agent,
+    SUPERVISOR_PROMPT,
+    SUPERVISOR_MODEL,
     agents
 )
 from tools import sequential_thinking
 from langchain_core.tools import tool
 import config
+from debate import debate_app, DebateState
 
 @tool
 def route_to_econpaper(reason: str) -> str:
@@ -72,16 +73,29 @@ router_tools = [
 
 # Confidence threshold + JSON parsing for robust debate routing
 def parse_supervisor_output(state):
-    """Parse Supervisor's JSON from last AIMessage."""
+    """Parse the Supervisor's JSON output from the last AIMessage in the state.
+
+    Extracts routing decision data (route, confidence, justify) from the last message's
+    content using regex to find JSON objects. If no JSON is found or parsing fails,
+    returns default values indicating end of workflow.
+
+    Args:
+        state (dict): The current agent state containing messages.
+
+    Returns:
+        dict: Parsed route data with keys 'route', 'confidence', 'justify'.
+              Defaults to {"route": "END", "confidence": 1.0, "justify": "..."} on failure.
+    """
     if not state["messages"]:
         return {"route": "END", "confidence": 1.0, "justify": "No messages"}
     msg = state["messages"][-1].content
+    # Use regex to find the first JSON object in the message content
     json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', msg, re.DOTALL)
     if not json_match:
         return {"route": "END", "confidence": 1.0, "justify": "No JSON found"}
     try:
         route_data = json.loads(json_match.group())
-        # Persist in next_message for report/logging
+        # Persist route data in a system message for report/logging purposes
         next_msg = SystemMessage(content=f"Route data: {route_data}")
         state["messages"].append(next_msg)  # Temp log
         return route_data
@@ -89,7 +103,18 @@ def parse_supervisor_output(state):
         return {"route": "END", "confidence": 0.5, "justify": "JSON parse fail"}
 
 
-def should_force_debate(route_data):
+def should_force_debate(route_data) -> bool:
+    """Determine if debate mode should be forced based on routing data.
+
+    Checks if the route is explicitly 'debate', confidence is below 0.8, or justification
+    contains keywords indicating controversy or need for debate.
+
+    Args:
+        route_data (dict): Parsed route data from supervisor output.
+
+    Returns:
+        bool: True if debate should be forced, False otherwise.
+    """
     conf = route_data.get("confidence", 1.0)
     justify = route_data.get("justify", "").lower()
     return (route_data.get("route") == "debate" or
@@ -145,17 +170,50 @@ class AgentState(TypedDict):
     last_agent: str
 
 def parse_route_tool(name: str) -> str:
+    """Parse the agent name from a route tool function name.
+
+    Extracts the agent name by removing the 'route_to_' prefix.
+
+    Args:
+        name (str): The route tool function name (e.g., 'route_to_econpaper').
+
+    Returns:
+        str: The extracted agent name (e.g., 'econpaper').
+
+    Raises:
+        ValueError: If the name does not start with 'route_to_'.
+    """
     if name.startswith("route_to_"):
         return name[9:]
     raise ValueError(f"Unknown route tool: {name}")
 
-def route_agent(state):
+def route_agent(state) -> str:
+    """Route agent based on error state.
+
+    If there's a last_error, route to remediation; otherwise, to supervisor.
+
+    Args:
+        state (dict): The current agent state.
+
+    Returns:
+        str: Next node name ('remediation' or 'supervisor').
+    """
     if state.get("last_error"):
         return "remediation"
     else:
         return "supervisor"
 
-def route_remediation(state):
+def route_remediation(state) -> str:
+    """Route based on remediation decision.
+
+    Handles rephrase (back to last agent), fallback/abort (to supervisor or END).
+
+    Args:
+        state (dict): The current agent state with remediation_decision.
+
+    Returns:
+        str: Next node name or END.
+    """
     decision = state.get("remediation_decision", {})
     action = decision.get("action")
     if action == "rephrase":
@@ -168,8 +226,19 @@ def route_remediation(state):
     else:
         return "supervisor"
 
-def create_workflow(selected_agents):
-    # Filter selected agents to valid ones
+def create_workflow(selected_agents: list[str]) -> Any:
+    """Create the LangGraph workflow for the CompeteGrok agent system.
+
+    Builds a state graph with supervisor, agent nodes, debate subgraph, and remediation,
+    based on selected agents. Includes routing logic, loop prevention, and conditional edges.
+
+    Args:
+        selected_agents (list[str]): List of selected agent names.
+
+    Returns:
+        Compiled LangGraph app ready for invocation.
+    """
+    # Validate and filter selected agents to only include valid ones
     valid_agents = ["econpaper", "econquant", "explainer", "marketdef", "docanalyzer", "caselaw", "synthesis", "verifier"]
     AGENT_NAMES = [name for name in selected_agents if name in valid_agents]
     include_debate = any(name in selected_agents for name in ["pro", "con", "arbiter"])
@@ -215,6 +284,14 @@ def create_workflow(selected_agents):
             return END
 
     def create_agent_node(agent_name: str):
+        """Factory function to create a node function for the given agent.
+
+        Args:
+            agent_name (str): Name of the agent.
+
+        Returns:
+            function: Node function that invokes the agent and updates state.
+        """
         def node(state: AgentState) -> dict:
             try:
                 # For synthesis, filter messages to reduce context size
@@ -279,6 +356,17 @@ def create_workflow(selected_agents):
     agent_nodes = {name: create_agent_node(name) for name in AGENT_NAMES}
 
     def supervisor_node(state: AgentState) -> dict:
+        """Supervisor node that determines next routing based on agent selection and history.
+
+        Parses selected agents, applies deterministic routing logic, prevents loops,
+        and updates state with routes and messages.
+
+        Args:
+            state (AgentState): Current agent state.
+
+        Returns:
+            dict: Updated state with routes, messages, etc.
+        """
         try:
             # Extract selected_agents from the first HumanMessage
             selected_agents = []
@@ -371,37 +459,9 @@ def create_workflow(selected_agents):
     app = workflow.compile()
     return app
 
-# Debate subgraph
-def pro_node(state: AgentState) -> dict:
-    result = agents["pro"].invoke({"messages": state["messages"]})
-    return {"messages": result["messages"]}
-
-def con_node(state: AgentState) -> dict:
-    result = agents["con"].invoke({"messages": state["messages"]})
-    return {"messages": result["messages"]}
-
-def arbiter_node(state: AgentState) -> dict:
-    result = agents["arbiter"].invoke({"messages": state["messages"]})
-    return {
-        "messages": result["messages"],
-        "debate_round": state.get("debate_round", 0) + 1
-    }
-
-debate_workflow = StateGraph(AgentState)
-debate_workflow.add_node("pro", pro_node)
-debate_workflow.add_node("con", con_node)
-debate_workflow.add_node("arbiter", arbiter_node)
-debate_workflow.set_entry_point("pro")
-debate_workflow.add_edge("pro", "con")
-debate_workflow.add_edge("con", "arbiter")
-debate_workflow.add_conditional_edges(
-    "arbiter",
-    lambda state: "pro" if state.get("debate_round", 0) < config.DEBATE_ROUND_LIMIT else END,
-    {"pro": "pro", "__end__": END}
-)
-debate_app = debate_workflow.compile()
 
 def debate_node(state: AgentState) -> dict:
+    """Invoke the debate subgraph and update state with debate results."""
     try:
         result = debate_app.invoke(state)
         logger.info("Node debate complete")
@@ -415,6 +475,7 @@ def debate_node(state: AgentState) -> dict:
         return {"messages": [SystemMessage(content=f"Error in debate: {e}. Reflect: retry or caveats.")]}
 
 def remediation_node(state: AgentState) -> dict:
+    """Handle remediation by invoking remediation agent and executing decision."""
     if not state.get("last_error"):
         return state
     try:

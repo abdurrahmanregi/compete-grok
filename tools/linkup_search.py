@@ -10,7 +10,8 @@ def linkup_search(query: str) -> dict:
         client = LinkupClient(api_key=LINKUP_API_KEY)
         response = client.search(
             query=query,
-            depth="deep",
+            # depth="deep",
+            depth="standard",
             output_type="searchResults"
         )
         results = response.get("sources", response.get("results", []))

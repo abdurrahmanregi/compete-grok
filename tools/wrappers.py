@@ -1,3 +1,4 @@
+from functools import lru_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 from .tavily_search import tavily_search as _tavily_search
 from .linkup_search import linkup_search as _linkup_search
@@ -11,6 +12,7 @@ class ToolExecutionError(Exception):
     pass
 
 
+@lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def tavily_search(query: str, time_range: str = "year") -> dict:
     result = _tavily_search(query, time_range)
@@ -19,6 +21,7 @@ def tavily_search(query: str, time_range: str = "year") -> dict:
     return result
 
 
+@lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def linkup_search(query: str) -> dict:
     result = _linkup_search(query)
@@ -27,6 +30,7 @@ def linkup_search(query: str) -> dict:
     return result
 
 
+@lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def linkup_fetch(url: str) -> dict:
     result = _linkup_fetch(url)
@@ -35,6 +39,7 @@ def linkup_fetch(url: str) -> dict:
     return result
 
 
+@lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def tavily_extract(url: str) -> dict:
     result = _tavily_extract(url)
@@ -43,6 +48,7 @@ def tavily_extract(url: str) -> dict:
     return result
 
 
+@lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def convert_pdf_url(url: str) -> str:
     result = _convert_pdf_url(url)

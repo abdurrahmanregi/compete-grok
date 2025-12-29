@@ -8,6 +8,16 @@ TAVILY_API_KEY = os.getenv('TAVILY_API_KEY')
 MISTRAL_API_KEY = os.getenv('MISTRAL_API_KEY')
 LINKUP_API_KEY = os.getenv('LINKUP_API_KEY')
 
+# Validate API keys
+if not XAI_API_KEY:
+    print("Warning: XAI_API_KEY not set. Using mock models.")
+if not TAVILY_API_KEY:
+    print("Warning: TAVILY_API_KEY not set. Tavily tools may fail.")
+if not MISTRAL_API_KEY:
+    print("Warning: MISTRAL_API_KEY not set. PDF conversion may fail.")
+if not LINKUP_API_KEY:
+    print("Warning: LINKUP_API_KEY not set. Linkup tools may fail.")
+
 # Models from AGENTS.md
 SUPERVISOR_MODEL = "grok-4-1-fast-reasoning"
 ECONPAPER_MODEL = "grok-4-1-fast-reasoning"

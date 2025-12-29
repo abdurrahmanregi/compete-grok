@@ -146,8 +146,3 @@ For detailed prompts and routing, see `AGENTS.md`.
 
 For more details, refer to `AGENTS.md`.
 
-## PDF Tools Update (Mistral OCR Native)
-- `convert_pdf_url` / `convert_pdf_file`: Now direct Mistral AI OCR SDK (mistral-ocr-latest).
-  - No external MCP/pdf2md server.
-  - Input: URL/path str -> Output: Markdown str (tables as markdown, pages joined).
-  - Agents: Use directly for paper extraction.
