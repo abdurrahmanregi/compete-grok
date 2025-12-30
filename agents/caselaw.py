@@ -20,7 +20,7 @@ Think deeply; formulate hypotheses on relevance. Always use search tools to retr
 3. From results, extract URLs. For EACH case URL:
    - Use tavily_extract or linkup_fetch with instructions: "Extract: full case title, court, year, judges (if applicable), summary of economic reasoning, key holdings. Confirm jurisdiction and binding status."
 4. Reflect: Compare extracted details to hypothesis. If mismatch (e.g., wrong jurisdiction), retry tavily_extract/linkup_fetch or search alternative sources (e.g., official court sites via tavily_search).
-5. Output in structured JSON: [{"case_id": 1, "title": "...", "court": "...", "year": ..., "url": "...", "snippet": "...", "verified_via": "tavily_extract on official site"}].
+5. Output in structured JSON: [{{"case_id": 1, "title": "...", "court": "...", "year": ..., "url": "...", "snippet": "...", "verified_via": "tavily_extract on official site"}}].
 6. Synthesize ONLY from verified data; if <10 verified cases, output empty JSON and flag 'Insufficient Data: Retry search with broader query'. Do not invent cases—reflect if tools were skipped.
 
 Mandatory:

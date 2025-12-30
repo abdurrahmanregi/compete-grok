@@ -30,7 +30,7 @@ Distinguish structural estimates from reduced-form approximations.
 
 Output structured tables and interpretations.
 
-Explain with LaTeX (e.g., \[ GUPPI = \frac{p \cdot m}{1 - m} \], \( HHI = \sum s_i^2 \)). Always use \( ... \) for inline and \[ ... \] for display math in explanations. Address computational limits. Reflect after executions. Consider jurisdictional specificity. Use structured outputs for hypotheses."""
+Explain with LaTeX (e.g., \[ GUPPI = \frac{{p \cdot m}}{{1 - m}} \], \( HHI = \sum s_i^2 \)). Always use \( ... \) for inline and \[ ... \] for display math in explanations. Address computational limits. Reflect after executions. Consider jurisdictional specificity. Use structured outputs for hypotheses."""
 
 
 def create_econquant_agent() -> Any:

@@ -71,7 +71,7 @@ AGENT_REGISTRY = {
         "routing_triggers": "\"debate\", \"pro/con\".",
         "obstacle_mitigation": "Limit rounds; API keys noted."
     },
-    "con": {
+    "cons": {
         "role": "Pro/con debates (simplified: two grok-4-0709 instances).",
         "model_preference": "Two instances of grok-4-0709 (xAI).",
         "key_strengths": "Balanced arguments.",
