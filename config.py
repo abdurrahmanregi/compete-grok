@@ -60,21 +60,25 @@ RUN_CODE_R_CMD = "Rscript"
 RUN_CODE_R_ARGS = [r"C:\Users\abdur\OneDrive\Work\R-MCP\run_code_r.R"]
 RUN_CODE_R_ENV = {}
 
-TAVILY_CMD = "npx"
+# Determine npx command based on OS
+IS_WINDOWS = os.name == 'nt'
+NPX_CMD = "npx.cmd" if IS_WINDOWS else "npx"
+
+TAVILY_CMD = NPX_CMD
 TAVILY_ARGS = ["@modelcontextprotocol/server-tavily-search"]
 TAVILY_ENV = {"TAVILY_API_KEY": TAVILY_API_KEY}
 TAVILY_MAX_RESULTS = 5
 
-LINKUP_CMD = "npx"
+LINKUP_CMD = NPX_CMD
 LINKUP_ARGS = ["-y", "linkup-mcp-server"]
 LINKUP_ENV = {}
 
-SEQUENTIAL_CMD = "npx"
+SEQUENTIAL_CMD = NPX_CMD
 SEQUENTIAL_ARGS = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
 SEQUENTIAL_ENV = {}
 
 
-FILESYSTEM_CMD = "npx"
+FILESYSTEM_CMD = NPX_CMD
 FILESYSTEM_ARGS = ["@modelcontextprotocol/server-filesystem", "-y", r"C:\Users\abdur\OneDrive\Work\compete-grok"]
 FILESYSTEM_ENV = {}
 

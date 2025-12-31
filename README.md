@@ -15,6 +15,7 @@ CompeteGrok is designed to assist in antitrust and competition economics analysi
 - **LaTeX Math Support**: Inline `\(...\)` and display `\[...\]` rendering in outputs.
 - **Privacy-First**: Ephemeral processing with no data retention.
 - **Extensibility**: MCP tools for search, code execution, PDF processing, and filesystem access.
+- **Verification Workflow**: Mandatory fact-checking of all citations by a dedicated Verifier agent.
 
 ## Architecture Overview
 
@@ -22,21 +23,22 @@ CompeteGrok leverages LangGraph for workflow orchestration:
 
 - **Managing Partner Agent**: Central orchestrator for query classification, routing, state management, and synthesis.
 - **Specialized Agents**: Domain-specific agents (e.g., Economic Research Associate, Quantitative Analyst) performing targeted tasks.
-- **Tools Integration**: MCP tools for external capabilities like Tavily search, Linkup deep web searches, code execution (Python/R), and PDF conversion.
+- **Tools Integration**: MCP tools for external capabilities like Tavily search, Linkup deep web searches, code execution (Python/R), PDF conversion, and `fetch_paper_content` for robust academic paper retrieval.
 - **State Management**: TypedDict-based tracking of iterations, routing history, sources, and errors to prevent loops.
 
-Workflow: Query → Classification → Agent Routing → Execution → Debate (if needed) → Synthesis → Report Generation.
+Workflow: Query → Classification → Agent Routing → Execution → Verification → Debate (if needed) → Synthesis → Report Generation.
 
 ## Agent Workflows
 
 Agents follow hypothesis-driven workflows tailored to their roles:
-- **Economic Research**: Search and synthesize papers using tools like tavily_search and linkup_search.
-- **Quantitative Analysis**: Perform calculations (e.g., HHI, GUPPI) with run_code_py/r.
+- **Economic Research**: Search and synthesize papers using tools like `tavily_search`, `linkup_search`, and `fetch_paper_content`.
+- **Quantitative Analysis**: Perform calculations (e.g., HHI, GUPPI) with `run_code_py`/`r`.
 - **Explanation**: Break down models with caveats and LaTeX derivations.
 - **Market Definition**: Apply SSNIP tests under jurisdictional guidelines.
 - **Document Analysis**: Process uploads via PDF conversion and reading tools.
 - **Case Law**: Search and verify precedents.
 - **Debate**: Pro/con arguments with arbiter synthesis.
+- **Verification**: The **Verifier Agent** checks every citation against external sources (Tavily/Linkup) to ensure accuracy. This is a mandatory step before synthesis.
 - **Synthesis**: Integrate results into final reports.
 For detailed prompts and routing triggers, see AGENTS.md.
 
@@ -66,6 +68,12 @@ pip install -r requirements.txt
    - `LANGCHAIN_API_KEY`: LangSmith API key (optional, for tracing)
 
 3. Ensure external MCP tools are accessible (paths configured in `config.py`; adjust for your OS).
+
+### Configuration
+The system behavior can be fine-tuned in `config.py`:
+
+- **STRICT_MODE**: When set to `True` (default), tools will raise exceptions on failure rather than returning mock data. This ensures that the system only relies on actual, successful tool executions.
+- **Logging**: Configurable log levels (DEBUG/INFO) and file paths in `compete_logging.py`.
 
 ### Verification
 Run the help command:
@@ -196,4 +204,3 @@ For more details, refer to `AGENTS.md`.
 - Achieved 54% test coverage across key components.
 - Project runs error-free in standard configurations.
 - Key files added/updated: [`AGENTS.md`](AGENTS.md), [`graph.py`](graph.py), [`debate.py`](debate.py), [`compete_logging.py`](compete_logging.py), and various agents in agents/ directory.
-

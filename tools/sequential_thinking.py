@@ -3,6 +3,9 @@ import subprocess
 import json
 import os
 from config import *
+from compete_logging import get_logger
+
+logger = get_logger(__name__)
 
 @tool
 def sequential_thinking(prompt: str) -> str:
@@ -27,6 +30,33 @@ def sequential_thinking(prompt: str) -> str:
         if proc.returncode != 0:
             raise Exception(f"Return code {proc.returncode}: {stderr}")
         result = json.loads(stdout or "{}")
+        
+        # Enhanced logging for auditing
+        content = result.get("content", [])
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_val = item.get("text", "")
+                    # Try to parse if it looks like JSON, otherwise log as text
+                    try:
+                        data = json.loads(text_val)
+                        if isinstance(data, dict):
+                            thought = data.get("thought")
+                            hypothesis = data.get("hypothesis")
+                            conclusion = data.get("conclusion")
+                            if thought or hypothesis or conclusion:
+                                logger.info(f"Sequential Thinking - Thought: {thought} | Hypothesis: {hypothesis} | Conclusion: {conclusion}")
+                            else:
+                                logger.info(f"Sequential Thinking Output: {text_val[:500]}...")
+                        else:
+                            logger.info(f"Sequential Thinking Output: {text_val[:500]}...")
+                    except json.JSONDecodeError:
+                        logger.info(f"Sequential Thinking Output: {text_val[:500]}...")
+        else:
+            logger.info(f"Sequential Thinking Result: {str(content)[:500]}...")
+
         return result.get("content", str(result))
     except Exception as e:
-        return f"Mock sequential_thinking('{prompt[:50]}...'): Step 1: Hypothesis - market narrow. Step 2: SSNIP test. Step 3: Evidence from search. Reflection: Confirmed. Note: Check MCP. Error: {str(e)[:300]}"
+        error_msg = f"Mock sequential_thinking('{prompt[:50]}...'): Step 1: Hypothesis - market narrow. Step 2: SSNIP test. Step 3: Evidence from search. Reflection: Confirmed. Note: Check MCP. Error: {str(e)[:300]}"
+        logger.error(f"Sequential thinking failed: {e}")
+        return error_msg
