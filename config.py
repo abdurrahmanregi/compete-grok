@@ -34,22 +34,22 @@ EXPLAINER_MODEL = "grok-4-1-fast-reasoning"
 MARKETDEF_MODEL = "grok-4-1-fast-reasoning"
 DOCANALYZER_MODEL = "grok-4-1-fast-reasoning"
 CASELAW_MODEL = "grok-4-1-fast-reasoning"
-SYNTHESIS_MODEL = "grok-4-1-fast-non-reasoning"
-REMEDIATION_MODEL = "grok-4-1-fast-non-reasoning"
+SYNTHESIS_MODEL = "grok-4-1-fast-reasoning"
+REMEDIATION_MODEL = "grok-4-1-fast-reasoning"
 # Debate Module Agents
 DEBATE_PRO_MODEL = "grok-4-1-fast-reasoning"
 DEBATE_CONS_MODEL = "grok-4-1-fast-reasoning"
-DEBATE_ARBITER_MODEL = "grok-4-1-fast-non-reasoning"
+DEBATE_ARBITER_MODEL = "grok-4-1-fast-reasoning"
 TEAMFORMATION_MODEL = "grok-4-1-fast-reasoning"
 VERIFIER_MODEL = "grok-4-1-fast-reasoning"
 
 SAMPLING_PARAMS = {
-    "default": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
-    "econquant": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
+    "default": {"temperature": 0.5, "top_p": 0.95, "extra_body": {"top_k": 20}},
+    "econquant": {"temperature": 0.5, "top_p": 0.95, "extra_body": {"top_k": 20}},
     # "supervisor": {"temperature": 0.5, "top_p": 0.95, "max_tokens": 65536, "extra_body": {"top_k": 20}},
     # "synthesis": {"temperature": 0.6, "top_p": 0.95, "max_tokens": 65536, "extra_body": {"top_k": 20}}
-    "supervisor": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}},
-    "synthesis": {"temperature": 0.1, "top_p": 0.95, "extra_body": {"top_k": 20}}
+    "supervisor": {"temperature": 0.6, "top_p": 0.95, "extra_body": {"top_k": 20}},
+    "synthesis": {"temperature": 0.6, "top_p": 0.95, "extra_body": {"top_k": 20}}
 }
 
 # MCP Paths

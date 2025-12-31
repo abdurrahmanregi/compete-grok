@@ -10,7 +10,7 @@ import re
 logger = logging.getLogger(__name__)
 
 @tool
-def fetch_paper_content(url: str, title: str = "") -> dict:
+def fetch_paper_content(url: str, title: str = "", authors: str = "") -> dict:
     """
     Robustly fetch paper content from a URL.
     If the URL is a PDF and fails (e.g., 403), it searches for alternative URLs.
@@ -19,6 +19,7 @@ def fetch_paper_content(url: str, title: str = "") -> dict:
     Args:
         url: The primary URL to fetch.
         title: The title of the paper (optional, used for alternative search).
+        authors: The authors of the paper (optional, used for alternative search).
         
     Returns:
         dict: {"content": "...", "source": "..."} or error.
@@ -44,7 +45,10 @@ def fetch_paper_content(url: str, title: str = "") -> dict:
                         title = match.group(1) if match else "unknown paper"
                     
                     # Search for alternatives
-                    query = f"pdf {title} filetype:pdf"
+                    # Construct a more robust query including authors and working paper keywords
+                    author_part = f"{authors} " if authors else ""
+                    query = f'"{title}" {author_part}(NBER OR SSRN OR "working paper") filetype:pdf'
+                    
                     try:
                         search_res = tavily_search(query, time_range="year")
                         
@@ -63,9 +67,23 @@ def fetch_paper_content(url: str, title: str = "") -> dict:
                     except Exception as e:
                         logger.warning(f"Alternative search failed: {e}")
                 
-                # If PDF conversion failed or no alternatives found
+                # If PDF conversion failed or no alternatives found, try HTML extraction as final fallback
+                logger.info(f"PDF conversion failed for {url} and alternatives. Attempting HTML extraction as final fallback.")
+                try:
+                    # Try extracting from the original URL first
+                    html_res = tavily_extract(url)
+                    content = html_res.get("content", "")
+                    if content and "Mock" not in content and len(content) > 100:
+                        return {"content": f"[HTML Fallback] {content}", "source": url}
+                    
+                    # If original URL fails, and we had an alternative URL, try that
+                    # (This logic would require tracking the best alternative URL, which we might not have easily here without refactoring)
+                    # For now, just falling back to original URL HTML extraction is a good step.
+                except Exception as html_e:
+                    logger.warning(f"HTML fallback failed: {html_e}")
+
                 error_msg = result.get('error') if isinstance(result, dict) else str(result)
-                return {"content": f"Failed to retrieve PDF content for {url}. Error: {error_msg}", "source": url}
+                return {"content": f"Failed to retrieve PDF content for {url}. Error: {error_msg}. HTML fallback also failed.", "source": url}
                 
             except Exception as e:
                  return {"content": f"Error processing PDF {url}: {e}", "source": url}

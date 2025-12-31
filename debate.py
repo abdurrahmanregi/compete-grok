@@ -49,21 +49,32 @@ def arbiter_node(state: DebateState) -> dict:
         result = agents["arbiter"].invoke({"messages": state["messages"]})
         logger.info("Arbiter agent completed successfully")
         
-        # Parse should_continue from arbiter output
+        # Parse should_continue and feedback from arbiter output
         should_continue = False
+        feedback = None
         last_msg = result["messages"][-1]
+        
         if isinstance(last_msg, AIMessage):
             content = last_msg.content
-            json_match = re.search(r'\{[^{}]*"should_continue"[^{}]*\}', content, re.DOTALL)
+            # Look for JSON containing should_continue
+            # Use a more permissive regex to capture the full JSON object including feedback
+            json_match = re.search(r'\{.*"should_continue".*\}', content, re.DOTALL)
             if json_match:
                 try:
                     data = json.loads(json_match.group())
                     should_continue = data.get("should_continue", False)
+                    feedback = data.get("feedback")
                 except json.JSONDecodeError:
                     logger.warning("Failed to parse JSON from arbiter output")
         
+        # Inject feedback as a SystemMessage if continuing
+        messages = result["messages"]
+        if should_continue and feedback:
+            logger.info(f"Injecting arbiter feedback: {feedback}")
+            messages.append(SystemMessage(content=f"Moderator Feedback for next round: {feedback}"))
+
         return {
-            "messages": result["messages"],
+            "messages": messages,
             "debate_round": state.get("debate_round", 0) + 1,
             "should_continue": should_continue
         }

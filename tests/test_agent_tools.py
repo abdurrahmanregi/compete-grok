@@ -31,14 +31,21 @@ class TestFetchPaperContent:
         }
         
         # Use invoke for LangChain tool
-        result = fetch_paper_content.invoke({"url": "http://example.com/paper.pdf", "title": "Test Paper"})
+        result = fetch_paper_content.invoke({
+            "url": "http://example.com/paper.pdf",
+            "title": "Test Paper",
+            "authors": "Doe, J."
+        })
         
         assert result["content"] == "Alternative PDF Content"
         assert result["source"] == "http://alt.com/paper.pdf"
         
         # Verify calls
         assert mock_convert.call_count == 2
-        mock_search.assert_called_once()
+        
+        # Verify the search query includes title, authors, and keywords
+        expected_query = '"Test Paper" Doe, J. (NBER OR SSRN OR "working paper") filetype:pdf'
+        mock_search.assert_called_once_with(expected_query, time_range="year")
 
     @patch('tools.fetch_paper.tavily_extract')
     def test_fetch_paper_content_non_pdf(self, mock_extract):

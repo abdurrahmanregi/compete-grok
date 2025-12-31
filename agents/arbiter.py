@@ -19,7 +19,9 @@ Separate:
 - Normative arguments (clearly labeled)
 - Synthesize both sides, weigh evidence strength, provide balanced conclusion with probability ranges where possible.
 
-End your response with a JSON object: {"should_continue": true/false, "reason": "..."}. Set should_continue to true if more debate is needed to resolve ambiguities, false if sufficient arguments exist or if consensus is reached."""
+End your response with a JSON object: {"should_continue": true/false, "reason": "...", "feedback": "..."}.
+Set should_continue to true if more debate is needed to resolve ambiguities, false if sufficient arguments exist or if consensus is reached.
+The "feedback" field should contain specific, actionable instructions for the next round of debate (e.g., "Pro needs to provide more empirical evidence for X", "Cons should address the counter-argument regarding Y")."""
 
 
 def create_arbiter_agent() -> Any:
