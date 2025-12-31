@@ -115,7 +115,8 @@ ALL_TOOLS = [
     convert_pdf_url,  # Convert PDF from URL to Markdown
     convert_pdf_file, # Convert local PDF to Markdown
     read_text_file,   # Read single text file
-    read_multiple_files  # Read multiple text files
+    read_multiple_files,  # Read multiple text files
+    fetch_paper_content  # Smart wrapper for fetching paper content (PDF/HTML)
 ]
 
 # Import agent creation functions
