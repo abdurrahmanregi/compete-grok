@@ -25,7 +25,10 @@ More text
         fixed_path = fix_md_math(temp_path)
         with open(fixed_path, 'r') as f:
             fixed_content = f.read()
-        assert r'\[ E = mc^2 \]' not in fixed_content  # Should be dedented
+        # Check that the indented version is NOT present
+        assert r'    \[ E = mc^2 \]' not in fixed_content
+        # Check that the dedented version IS present
+        assert r'\[ E = mc^2 \]' in fixed_content
         assert 'E = mc^2' in fixed_content
     finally:
         os.unlink(temp_path)

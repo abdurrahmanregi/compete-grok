@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 from agents import create_agent, agents
 from agents.supervisor import SUPERVISOR_PROMPT
+from agents.schemas import EconPaperOutput, CaseLawOutput, VerifierOutput
 from config import SUPERVISOR_MODEL
 from tools import sequential_thinking
 from langchain_core.tools import tool
@@ -323,6 +324,41 @@ def create_workflow(selected_agents: list[str]) -> Any:
                         messages_to_use = filtered_messages
 
                     result = agents[agent_name].invoke({"messages": messages_to_use})
+                    
+                    # Output Validation
+                    if agent_name in ["econpaper", "caselaw", "verifier"]:
+                        last_msg = result["messages"][-1]
+                        if isinstance(last_msg, AIMessage) and not (hasattr(last_msg, "tool_calls") and last_msg.tool_calls):
+                            try:
+                                content = last_msg.content
+                                # Extract JSON list or object
+                                json_match = re.search(r'(\[.*\]|\{.*\})', content, re.DOTALL)
+                                if json_match:
+                                    json_str = json_match.group(1)
+                                    data = json.loads(json_str)
+                                    
+                                    if agent_name == "econpaper":
+                                        if isinstance(data, list):
+                                            EconPaperOutput(papers=data)
+                                        else:
+                                            EconPaperOutput(**data)
+                                    elif agent_name == "caselaw":
+                                        if isinstance(data, list):
+                                            CaseLawOutput(cases=data)
+                                        else:
+                                            CaseLawOutput(**data)
+                                    elif agent_name == "verifier":
+                                        if isinstance(data, list):
+                                            VerifierOutput(citations=data)
+                                        else:
+                                            VerifierOutput(**data)
+                                    logger.info(f"Validation successful for {agent_name}")
+                                else:
+                                    logger.warning(f"No JSON found in {agent_name} output for validation")
+                            except Exception as e:
+                                logger.error(f"Validation failed for {agent_name}: {e}")
+                                raise ValueError(f"Output validation failed: {e}")
+
                     logger.info("Node %s complete", agent_name)
                     final_synthesis = ""
                     if agent_name == "synthesis":
@@ -397,15 +433,20 @@ def create_workflow(selected_agents: list[str]) -> Any:
 
                 # Deterministic routing logic based on selected_agents and routing_history
                 routing_history = state.get("routing_history", [])
-                agents_to_route = [a for a in selected_agents if a not in ["synthesis", "verifier", "pro", "cons", "arbiter"] and a not in routing_history]
-                if agents_to_route:
-                    routes = [agents_to_route[0]]
-                elif "verifier" in selected_agents and "verifier" not in routing_history and ("econpaper" in routing_history or "caselaw" in routing_history):
+                last_agent = routing_history[-1] if routing_history else None
+
+                # Enforce verification: If econpaper or caselaw just ran, route to verifier
+                # unless verifier has already run for that specific research iteration.
+                if last_agent in ["econpaper", "caselaw"] and "verifier" in selected_agents:
                     routes = ["verifier"]
-                elif state.get("force_debate", False) and any(name in selected_agents for name in ["pro", "cons", "arbiter"]):
-                    routes = ["debate"]
                 else:
-                    routes = []
+                    agents_to_route = [a for a in selected_agents if a not in ["synthesis", "verifier", "pro", "cons", "arbiter"] and a not in routing_history]
+                    if agents_to_route:
+                        routes = [agents_to_route[0]]
+                    elif state.get("force_debate", False) and any(name in selected_agents for name in ["pro", "cons", "arbiter"]):
+                        routes = ["debate"]
+                    else:
+                        routes = []
 
                 # Update routing_history
                 routing_history = routing_history + routes

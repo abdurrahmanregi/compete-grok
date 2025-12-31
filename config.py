@@ -84,17 +84,21 @@ if not XAI_API_KEY:
 LOG_LEVEL = 'DEBUG' if os.getenv('VERBOSE') else 'INFO'
 
 # Initialize logging
-try:
-    log_file = os.getenv('LOG_FILE', 'logs/compete_grok.log')
-    setup_logging(LOG_LEVEL, log_file)
-    logger = get_logger(__name__)
-    logger.info("Logging initialized successfully")
-except Exception as e:
-    print(f"Failed to initialize logging: {e}")
-    raise ConfigurationError(f"Logging setup failed: {e}")
+# Moved to app.py to avoid side effects on import
+# try:
+#     log_file = os.getenv('LOG_FILE', 'logs/compete_grok.log')
+#     setup_logging(LOG_LEVEL, log_file)
+#     logger = get_logger(__name__)
+#     logger.info("Logging initialized successfully")
+# except Exception as e:
+#     print(f"Failed to initialize logging: {e}")
+#     raise ConfigurationError(f"Logging setup failed: {e}")
 
 # Maximum iterations for processing loops
 MAX_ITERATIONS = 2
+
+# Strict Mode: If True, tools raise exceptions instead of returning mocks.
+STRICT_MODE = True
 
 # Additional iteration and debate parameters
 MAX_CURRENT_ITERATION = 8

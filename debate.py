@@ -1,9 +1,11 @@
 # Debate logic separated for modularity
 
-from typing import TypedDict, Sequence, Any
+from typing import TypedDict, Sequence, Any, Optional
 from langgraph.graph import StateGraph, END
-from langchain_core.messages import BaseMessage, SystemMessage
+from langchain_core.messages import BaseMessage, SystemMessage, AIMessage
 import logging
+import json
+import re
 
 from agents import agents
 import config
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 class DebateState(TypedDict):
     messages: Sequence[BaseMessage]
     debate_round: int
+    should_continue: bool
 
 def pro_node(state: DebateState) -> dict:
     """Invoke the pro debate agent and return updated messages."""
@@ -45,16 +48,32 @@ def arbiter_node(state: DebateState) -> dict:
     try:
         result = agents["arbiter"].invoke({"messages": state["messages"]})
         logger.info("Arbiter agent completed successfully")
+        
+        # Parse should_continue from arbiter output
+        should_continue = False
+        last_msg = result["messages"][-1]
+        if isinstance(last_msg, AIMessage):
+            content = last_msg.content
+            json_match = re.search(r'\{[^{}]*"should_continue"[^{}]*\}', content, re.DOTALL)
+            if json_match:
+                try:
+                    data = json.loads(json_match.group())
+                    should_continue = data.get("should_continue", False)
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse JSON from arbiter output")
+        
         return {
             "messages": result["messages"],
-            "debate_round": state.get("debate_round", 0) + 1
+            "debate_round": state.get("debate_round", 0) + 1,
+            "should_continue": should_continue
         }
     except Exception as e:
         logger.error("Error in arbiter_node: %s", str(e), exc_info=True)
         error_msg = f"Error in arbiter debate agent: {e}. Reflect: retry or caveats."
         return {
             "messages": [SystemMessage(content=error_msg)],
-            "debate_round": state.get("debate_round", 0) + 1  # Still increment to avoid loops
+            "debate_round": state.get("debate_round", 0) + 1,  # Still increment to avoid loops
+            "should_continue": False
         }
 
 debate_workflow = StateGraph(DebateState)
@@ -66,7 +85,7 @@ debate_workflow.add_edge("pro", "cons")
 debate_workflow.add_edge("cons", "arbiter")
 debate_workflow.add_conditional_edges(
     "arbiter",
-    lambda state: "pro" if state.get("debate_round", 0) < config.DEBATE_ROUND_LIMIT else END,
+    lambda state: "pro" if state.get("should_continue", False) and state.get("debate_round", 0) < config.DEBATE_ROUND_LIMIT else END,
     {"pro": "pro", "__end__": END}
 )
 debate_app = debate_workflow.compile()

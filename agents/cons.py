@@ -13,6 +13,7 @@ DEBATE_TOOLS = ALL_TOOLS
 DEBATE_TEAM_PROMPT = """You are the [Pro/Con] advocate in a structured antitrust debate.
 
 Present only your side forcefully but fairly, citing evidence per hierarchy.
+Review previous arguments in the conversation history and directly address them.
 
 Separate:
 - Positive economic analysis

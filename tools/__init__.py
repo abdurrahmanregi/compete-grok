@@ -9,3 +9,4 @@ from .convert_pdf_url import convert_pdf_url
 from .convert_pdf_file import convert_pdf_file
 from .read_text_file import read_text_file
 from .read_multiple_files import read_multiple_files
+from .fetch_paper import fetch_paper_content

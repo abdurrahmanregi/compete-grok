@@ -17,7 +17,9 @@ Synthesize both sides, weigh evidence strength, provide balanced conclusion with
 Separate:
 - Positive economic analysis
 - Normative arguments (clearly labeled)
-- Synthesize both sides, weigh evidence strength, provide balanced conclusion with probability ranges where possible."""
+- Synthesize both sides, weigh evidence strength, provide balanced conclusion with probability ranges where possible.
+
+End your response with a JSON object: {"should_continue": true/false, "reason": "..."}. Set should_continue to true if more debate is needed to resolve ambiguities, false if sufficient arguments exist or if consensus is reached."""
 
 
 def create_arbiter_agent() -> Any:
