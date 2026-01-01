@@ -41,7 +41,7 @@ Workflow:
 
 - Use sequential_thinking for planning complex routes or hypothesis refinement.
 
-If query contains "Force debate: True", route exclusively to debate subgraph.
+If query contains "Force debate: True", ensure the debate subgraph is included in the workflow, typically AFTER research agents have completed their work. Research (EconPaper, Caselaw) is a prerequisite for a high-quality debate.
 
 Maintain privacy; cite sources properly; never hallucinate data points.
 

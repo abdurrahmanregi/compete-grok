@@ -61,7 +61,7 @@ def tavily_extract(url: str, extract_depth: str = "basic", format: str = "markdo
         # Fallback to linkup_fetch
         try:
             from tools.linkup_fetch import linkup_fetch
-            fallback_result = linkup_fetch(url)
+            fallback_result = linkup_fetch.invoke({"url": url})
             return fallback_result
         except Exception as fallback_e:
             logger.error(f"Fallback failed: {fallback_e}")
