@@ -1,62 +1,85 @@
 from langchain_core.tools import tool
-import subprocess
+from typing import Optional, List, Dict, Any
 import json
-import os
-from config import *
 from compete_logging import get_logger
 
 logger = get_logger(__name__)
 
-@tool
-def sequential_thinking(prompt: str) -> str:
-    """Sequential thinking for hypothesis testing."""
-    input_data = {"prompt": prompt}
-    cmd = [SEQUENTIAL_CMD] + SEQUENTIAL_ARGS
-    env = os.environ.copy()
-    env.update(SEQUENTIAL_ENV)
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env,
-            text=True,
-            encoding='utf-8'
-        )
-        json_input = json.dumps({"input": input_data})
-        stdout, stderr = proc.communicate(input=json_input, timeout=180)
-        proc.wait()
-        if proc.returncode != 0:
-            raise Exception(f"Return code {proc.returncode}: {stderr}")
-        result = json.loads(stdout or "{}")
-        
-        # Enhanced logging for auditing
-        content = result.get("content", [])
-        if isinstance(content, list):
-            for item in content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    text_val = item.get("text", "")
-                    # Try to parse if it looks like JSON, otherwise log as text
-                    try:
-                        data = json.loads(text_val)
-                        if isinstance(data, dict):
-                            thought = data.get("thought")
-                            hypothesis = data.get("hypothesis")
-                            conclusion = data.get("conclusion")
-                            if thought or hypothesis or conclusion:
-                                logger.info(f"Sequential Thinking - Thought: {thought} | Hypothesis: {hypothesis} | Conclusion: {conclusion}")
-                            else:
-                                logger.info(f"Sequential Thinking Output: {text_val[:500]}...")
-                        else:
-                            logger.info(f"Sequential Thinking Output: {text_val[:500]}...")
-                    except json.JSONDecodeError:
-                        logger.info(f"Sequential Thinking Output: {text_val[:500]}...")
-        else:
-            logger.info(f"Sequential Thinking Result: {str(content)[:500]}...")
+# Module-level state
+thought_history: List[Dict[str, Any]] = []
+thought_branches: Dict[str, List[Dict[str, Any]]] = {}
 
-        return result.get("content", str(result))
-    except Exception as e:
-        error_msg = f"Mock sequential_thinking('{prompt[:50]}...'): Step 1: Hypothesis - market narrow. Step 2: SSNIP test. Step 3: Evidence from search. Reflection: Confirmed. Note: Check MCP. Error: {str(e)[:300]}"
-        logger.error(f"Sequential thinking failed: {e}")
-        return error_msg
+def reset_thoughts():
+    """Clears the thought history and branches."""
+    global thought_history, thought_branches
+    thought_history.clear()
+    thought_branches.clear()
+    logger.info("Sequential thinking state reset.")
+
+@tool
+def sequential_thinking(
+    thought: str,
+    thoughtNumber: int,
+    totalThoughts: int,
+    nextThoughtNeeded: bool,
+    isRevision: Optional[bool] = False,
+    revisesThought: Optional[int] = None,
+    branchFromThought: Optional[int] = None,
+    branchId: Optional[str] = None,
+    needsMoreThoughts: Optional[bool] = None,
+) -> str:
+    """
+    A tool for dynamic, reflective problem-solving. It allows you to think through problems step-by-step,
+    revise previous thoughts, and branch out to explore different possibilities.
+
+    Args:
+        thought (str): The content of the current thought.
+        thoughtNumber (int): The current thought number (1-based).
+        totalThoughts (int): The estimated total number of thoughts needed.
+        nextThoughtNeeded (bool): Whether another thought is needed after this one.
+        isRevision (bool, optional): Whether this thought revises a previous one.
+        revisesThought (int, optional): The number of the thought being revised.
+        branchFromThought (int, optional): The number of the thought to branch from.
+        branchId (str, optional): Identifier for the current branch.
+        needsMoreThoughts (bool, optional): Explicit flag if more thoughts are needed (alternative to nextThoughtNeeded).
+
+    Returns:
+        str: A JSON string containing the current state of the thought process.
+    """
+    global thought_history, thought_branches
+
+    # Normalize nextThoughtNeeded
+    if needsMoreThoughts is not None:
+        nextThoughtNeeded = needsMoreThoughts
+
+    current_thought_data = {
+        "thought": thought,
+        "thoughtNumber": thoughtNumber,
+        "totalThoughts": totalThoughts,
+        "nextThoughtNeeded": nextThoughtNeeded,
+        "isRevision": isRevision,
+        "revisesThought": revisesThought,
+        "branchFromThought": branchFromThought,
+        "branchId": branchId,
+    }
+
+    # Add to history
+    thought_history.append(current_thought_data)
+    
+    # Handle branching (simplified storage)
+    if branchId:
+        if branchId not in thought_branches:
+            thought_branches[branchId] = []
+        thought_branches[branchId].append(current_thought_data)
+
+    # Log the thought
+    logger.info(f"Sequential Thinking - Thought {thoughtNumber}/{totalThoughts}: {thought[:100]}...")
+
+    # Construct response
+    response = {
+        "thought_history": thought_history,
+        "current_thought": current_thought_data,
+        "status": "Thinking..." if nextThoughtNeeded else "Complete"
+    }
+
+    return json.dumps(response, indent=2)

@@ -22,6 +22,7 @@ Think deeply; formulate hypotheses on relevance. Always use search tools to retr
 4. Reflect: Compare extracted details to hypothesis. If mismatch (e.g., wrong jurisdiction), retry tavily_extract/linkup_fetch or search alternative sources (e.g., official court sites via tavily_search).
 5. Output ONLY valid JSON. The output must be a raw JSON list, not wrapped in markdown code blocks. Format: [{{"case_id": 1, "title": "...", "court": "...", "year": ..., "url": "...", "snippet": "...", "verified_via": "tavily_extract on official site"}}].
 6. Synthesize ONLY from verified data; if <10 verified cases, output empty JSON and flag 'Insufficient Data: Retry search with broader query'. Do not invent cases—reflect if tools were skipped.
+7. If no relevant case law is found, you MUST output an empty JSON list: [].
 
 Mandatory:
 - Prioritize binding precedent in specified jurisdiction

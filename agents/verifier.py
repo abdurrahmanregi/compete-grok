@@ -44,6 +44,7 @@ Format (Papers): [{{"paper_id":1, "title":"verified_title", ..., "status":"verif
 Format (Cases): [{{"case_id": 1, "title": "verified_title", "court": "verified_court", "year": 2023, "status": "verified" or "unverified" or "rejected"}}]
 
 If <50% valid, abort with "Insufficient verified data—retry upstream".
+If there is nothing to verify or input is empty, you MUST output an empty JSON list: [].
 # Note: JSON braces escaped to avoid template variable interpretation
 
 Use sequential_thinking for per-citation hypothesis testing. Prioritize official sites. Avoid hallucinations—base solely on tool outputs."""

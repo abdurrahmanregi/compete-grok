@@ -28,8 +28,11 @@ class CaseLawOutput(BaseModel):
     cases: List[Case]
 
 class VerifiedCitation(BaseModel):
-    paper_id: int
+    paper_id: Optional[int] = None
+    case_id: Optional[int] = None
     title: str
+    court: Optional[str] = None
+    holding: Optional[str] = None
     status: str = Field(..., description="'verified' or 'unverified'")
     reason: Optional[str] = None
 

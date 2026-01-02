@@ -331,30 +331,38 @@ def create_workflow(selected_agents: list[str]) -> Any:
                         if isinstance(last_msg, AIMessage) and not (hasattr(last_msg, "tool_calls") and last_msg.tool_calls):
                             try:
                                 content = last_msg.content
+                                if not content or not content.strip():
+                                    raise ValueError("Empty output from agent")
+
                                 # Extract JSON list or object
                                 json_match = re.search(r'(\[.*\]|\{.*\})', content, re.DOTALL)
                                 if json_match:
                                     json_str = json_match.group(1)
-                                    data = json.loads(json_str)
-                                    
-                                    if agent_name == "econpaper":
-                                        if isinstance(data, list):
-                                            EconPaperOutput(papers=data)
-                                        else:
-                                            EconPaperOutput(**data)
-                                    elif agent_name == "caselaw":
-                                        if isinstance(data, list):
-                                            CaseLawOutput(cases=data)
-                                        else:
-                                            CaseLawOutput(**data)
-                                    elif agent_name == "verifier":
-                                        if isinstance(data, list):
-                                            VerifierOutput(citations=data)
-                                        else:
-                                            VerifierOutput(**data)
-                                    logger.info(f"Validation successful for {agent_name}")
+                                    try:
+                                        data = json.loads(json_str)
+                                    except json.JSONDecodeError:
+                                        # Fallback to whole string if regex extraction failed
+                                        data = json.loads(content)
                                 else:
-                                    logger.warning(f"No JSON found in {agent_name} output for validation")
+                                    # Fallback to whole string if no regex match
+                                    data = json.loads(content)
+                                    
+                                if agent_name == "econpaper":
+                                    if isinstance(data, list):
+                                        EconPaperOutput(papers=data)
+                                    else:
+                                        EconPaperOutput(**data)
+                                elif agent_name == "caselaw":
+                                    if isinstance(data, list):
+                                        CaseLawOutput(cases=data)
+                                    else:
+                                        CaseLawOutput(**data)
+                                elif agent_name == "verifier":
+                                    if isinstance(data, list):
+                                        VerifierOutput(citations=data)
+                                    else:
+                                        VerifierOutput(**data)
+                                logger.info(f"Validation successful for {agent_name}")
                             except Exception as e:
                                 logger.error(f"Validation failed for {agent_name}: {e}")
                                 raise ValueError(f"Output validation failed: {e}")

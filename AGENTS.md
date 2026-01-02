@@ -23,6 +23,31 @@ This file defines all agents in the system. Each agent has:
 - **Routing Triggers**: When Supervisor should call it.
 - **Obstacle Mitigation**: Handling challenges (e.g., API keys, latency).
 
+## Tool Usage Guidelines
+
+### sequential_thinking
+A tool for dynamic, reflective problem-solving. It allows you to think through problems step-by-step, revise previous thoughts, and branch out to explore different possibilities.
+
+**Arguments:**
+- `thought` (str): The content of the current thought.
+- `thoughtNumber` (int): The current thought number (1-based).
+- `totalThoughts` (int): The estimated total number of thoughts needed.
+- `nextThoughtNeeded` (bool): Whether another thought is needed after this one.
+- `isRevision` (bool, optional): Whether this thought revises a previous one.
+- `revisesThought` (int, optional): The number of the thought being revised.
+- `branchFromThought` (int, optional): The number of the thought to branch from.
+- `branchId` (str, optional): Identifier for the current branch.
+
+**Usage Example:**
+```json
+{
+  "thought": "The user wants to analyze the market definition. I should first consider the product market.",
+  "thoughtNumber": 1,
+  "totalThoughts": 3,
+  "nextThoughtNeeded": true
+}
+```
+
 ## Managing Partner Agent
 - **Role**: Central orchestrator—classifies, routes, manages state, synthesis.
 - **Model Preference**: grok-4-1-fast-reasoning from xAI.
