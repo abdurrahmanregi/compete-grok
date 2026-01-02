@@ -321,9 +321,18 @@ def create_workflow(selected_agents: list[str]) -> Any:
                             elif isinstance(msg, HumanMessage):
                                 # Include the original query
                                 filtered_messages.append(msg)
+                        
+                        # Inject collected sources
+                        if state.get("sources"):
+                            sources_str = json.dumps(state["sources"], indent=2)
+                            filtered_messages.append(SystemMessage(content=f"Collected Sources:\n{sources_str}"))
+                        
                         messages_to_use = filtered_messages
 
                     result = agents[agent_name].invoke({"messages": messages_to_use})
+                    
+                    # Calculate new messages to avoid duplication
+                    new_messages = result["messages"][len(messages_to_use):]
                     
                     # Output Validation
                     if agent_name in ["econpaper", "caselaw", "verifier"]:
@@ -379,14 +388,48 @@ def create_workflow(selected_agents: list[str]) -> Any:
                     new_sources = []
                     existing_urls = {s.get("url") for s in state.get("sources", [])}
                     for msg in result["messages"]:
-                        if hasattr(msg, "content") and isinstance(msg.content, dict) and "sources" in msg.content:
-                            for source in msg.content["sources"]:
-                                if source.get("url") and source["url"] not in existing_urls:
-                                    new_sources.append(source)
-                                    existing_urls.add(source["url"])
+                        if isinstance(msg, AIMessage) and msg.content:
+                            try:
+                                # Extract JSON if embedded in text
+                                content = msg.content
+                                json_match = re.search(r'(\[.*\]|\{.*\})', content, re.DOTALL)
+                                if json_match:
+                                    data = json.loads(json_match.group(1))
+                                else:
+                                    data = json.loads(content)
+
+                                # Normalize to list of items
+                                items = []
+                                if isinstance(data, dict):
+                                    if "papers" in data: items = data["papers"]
+                                    elif "cases" in data: items = data["cases"]
+                                    elif "citations" in data: items = data["citations"]
+                                    elif "sources" in data: items = data["sources"]
+                                elif isinstance(data, list):
+                                    items = data
+
+                                # Extract source info
+                                for item in items:
+                                    if isinstance(item, dict):
+                                        url = item.get("url")
+                                        title = item.get("title")
+                                        if url and url not in existing_urls:
+                                            source_entry = {
+                                                "url": url,
+                                                "title": title,
+                                                "year": item.get("year"),
+                                                "authors": item.get("authors"),
+                                                "court": item.get("court"),
+                                                "snippet": item.get("snippet"),
+                                                "type": "paper" if "authors" in item else "case" if "court" in item else "unknown"
+                                            }
+                                            new_sources.append(source_entry)
+                                            existing_urls.add(url)
+                            except (json.JSONDecodeError, AttributeError):
+                                pass
 
                     return {
-                        "messages": result["messages"],
+                        "messages": new_messages,
                         "iteration_count": state.get("iteration_count", 0) + 1,
                         "routing_history": state.get("routing_history", []) + [agent_name],
                         "final_synthesis": final_synthesis,
@@ -478,7 +521,7 @@ def create_workflow(selected_agents: list[str]) -> Any:
 
                 logger.info("Node supervisor complete, routes: %s, iteration: %d", routes, current_iteration)
                 return {
-                    "messages": operator.add(state["messages"], [routing_msg]),
+                    "messages": [routing_msg],
                     "routes": routes,
                     "iteration_count": state.get("iteration_count", 0),
                     "routing_history": routing_history,
@@ -535,8 +578,12 @@ def debate_node(state: AgentState) -> dict:
     try:
         result = debate_app.invoke(state)
         logger.info("Node debate complete")
+        
+        # Calculate new messages to avoid duplication
+        new_messages = result["messages"][len(state["messages"]):]
+        
         return {
-            "messages": operator.add(state["messages"], result["messages"]),
+            "messages": new_messages,
             "debate_count": state.get("debate_count", 0) + 1,
             "sources": state.get("sources", [])
         }
