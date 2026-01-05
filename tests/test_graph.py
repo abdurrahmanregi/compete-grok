@@ -57,10 +57,18 @@ def test_create_workflow_with_debate():
 def test_create_workflow_invalid_agent():
     """Test create_workflow with an invalid agent name."""
     selected_agents = ["supervisor", "invalid_agent"]
-    
-    with patch('graph.StateGraph'), patch('graph.create_agent'):
-        # Depending on implementation, this might raise an error or just ignore it
-        # Assuming it raises ValueError or similar if agent not found in registry
-        # But create_workflow might just try to create it.
-        # If create_agent raises error, we catch it.
-        pass
+
+    with patch('graph.StateGraph') as mock_state_graph, patch('graph.create_agent') as mock_create_agent:
+        mock_create_agent.return_value = MagicMock()
+        mock_graph_builder = MagicMock()
+        mock_app = MagicMock()
+        mock_graph_builder.compile.return_value = mock_app
+        mock_state_graph.return_value = mock_graph_builder
+
+        app = create_workflow(selected_agents)
+
+        # Assert that invalid_agent was filtered out, so add_node not called for it
+        node_names = [call.args[0] for call in mock_graph_builder.add_node.call_args_list]
+        assert "invalid_agent" not in node_names
+        assert "supervisor" in node_names
+        assert app == mock_app

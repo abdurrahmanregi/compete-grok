@@ -8,16 +8,15 @@ including JSON formatting, console and file handlers, and appropriate log levels
 import logging
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
 
     def format(self, record):
-        import datetime
         log_entry = {
-            "timestamp": datetime.datetime.fromtimestamp(record.created).isoformat() + "Z",
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z'),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

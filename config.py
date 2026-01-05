@@ -6,6 +6,8 @@ load_dotenv()
 from compete_logging import setup_logging, get_logger
 from exceptions import ConfigurationError
 
+logger = get_logger(__name__)
+
 # API Keys
 XAI_API_KEY = os.getenv('XAI_API_KEY')
 TAVILY_API_KEY = os.getenv('TAVILY_API_KEY')
@@ -18,13 +20,13 @@ VERBOSE = os.getenv('VERBOSE')
 
 # Validate API keys
 if not XAI_API_KEY:
-    print("Warning: XAI_API_KEY not set. Using mock models.")
+    logger.warning("Warning: XAI_API_KEY not set. Using mock models.")
 if not TAVILY_API_KEY:
-    print("Warning: TAVILY_API_KEY not set. Tavily tools may fail.")
+    logger.warning("Warning: TAVILY_API_KEY not set. Tavily tools may fail.")
 if not MISTRAL_API_KEY:
-    print("Warning: MISTRAL_API_KEY not set. PDF conversion may fail.")
+    logger.warning("Warning: MISTRAL_API_KEY not set. PDF conversion may fail.")
 if not LINKUP_API_KEY:
-    print("Warning: LINKUP_API_KEY not set. Linkup tools may fail.")
+    logger.warning("Warning: LINKUP_API_KEY not set. Linkup tools may fail.")
 
 # Models from AGENTS.md
 SUPERVISOR_MODEL = "grok-4-1-fast-reasoning"
@@ -83,7 +85,7 @@ FILESYSTEM_ARGS = ["@modelcontextprotocol/server-filesystem", "-y", r"C:\Users\a
 FILESYSTEM_ENV = {}
 
 if not XAI_API_KEY:
-    print("Warning: XAI_API_KEY missing. Tools/LLMs will use mocks.")
+    logger.warning("Warning: XAI_API_KEY missing. Tools/LLMs will use mocks.")
 
 LOG_LEVEL = 'DEBUG' if os.getenv('VERBOSE') else 'INFO'
 
