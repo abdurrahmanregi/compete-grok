@@ -18,6 +18,7 @@ from langchain_core.tools import tool
 import config
 from debate import debate_app, DebateState
 from exceptions import WorkflowError, AgentError, DebateError
+from pydantic import ValidationError
 
 @tool
 def route_to_econpaper(reason: str) -> str:
@@ -330,18 +331,20 @@ def create_workflow(selected_agents: list[str]) -> Any:
                         messages_to_use = filtered_messages
 
                     result = agents[agent_name].invoke({"messages": messages_to_use})
-                    
-                    # Calculate new messages to avoid duplication
-                    new_messages = result["messages"][len(messages_to_use):]
-                    
-                    # Output Validation
-                    if agent_name in ["econpaper", "caselaw", "verifier"]:
+
+                    # Pre-State-Update Validation
+                    schemas = {
+                        "econpaper": EconPaperOutput,
+                        "caselaw": CaseLawOutput,
+                        "verifier": VerifierOutput
+                    }
+                    if agent_name in schemas:
                         last_msg = result["messages"][-1]
                         if isinstance(last_msg, AIMessage) and not (hasattr(last_msg, "tool_calls") and last_msg.tool_calls):
                             try:
                                 content = last_msg.content
                                 if not content or not content.strip():
-                                    raise ValueError("Empty output from agent")
+                                    raise AgentError("Empty output from agent")
 
                                 # Extract JSON list or object
                                 json_match = re.search(r'(\[.*\]|\{.*\})', content, re.DOTALL)
@@ -350,32 +353,37 @@ def create_workflow(selected_agents: list[str]) -> Any:
                                     try:
                                         data = json.loads(json_str)
                                     except json.JSONDecodeError:
-                                        # Fallback to whole string if regex extraction failed
                                         data = json.loads(content)
                                 else:
-                                    # Fallback to whole string if no regex match
                                     data = json.loads(content)
-                                    
+
+                                model_class = schemas[agent_name]
                                 if agent_name == "econpaper":
                                     if isinstance(data, list):
-                                        EconPaperOutput(papers=data)
+                                        model_class(papers=data)
                                     else:
-                                        EconPaperOutput(**data)
+                                        model_class(**data)
                                 elif agent_name == "caselaw":
                                     if isinstance(data, list):
-                                        CaseLawOutput(cases=data)
+                                        model_class(cases=data)
                                     else:
-                                        CaseLawOutput(**data)
+                                        model_class(**data)
                                 elif agent_name == "verifier":
                                     if isinstance(data, list):
-                                        VerifierOutput(citations=data)
+                                        model_class(citations=data)
                                     else:
-                                        VerifierOutput(**data)
+                                        model_class(**data)
                                 logger.info(f"Validation successful for {agent_name}")
+                            except ValidationError as e:
+                                raise AgentError(f"Validation failed: {e}")
                             except Exception as e:
-                                logger.error(f"Validation failed for {agent_name}: {e}")
-                                raise ValueError(f"Output validation failed: {e}")
+                                raise AgentError(f"Output validation failed: {e}")
+                    else:
+                        logger.warning(f"No schema for {agent_name}, proceeding without validation")
 
+                    # Calculate new messages to avoid duplication
+                    new_messages = result["messages"][len(messages_to_use):]
+                    
                     logger.info("Node %s complete", agent_name)
                     final_synthesis = ""
                     if agent_name == "synthesis":
@@ -600,50 +608,75 @@ def remediation_node(state: AgentState) -> dict:
     if not state.get("last_error"):
         logger.debug("No last error, skipping remediation")
         return state
-    try:
-        # Create message for remediation agent
-        error_msg = state["last_error"]
-        task_instructions = "Process the error and decide on remediation action."
-        tool_name = "unknown"  # Could be improved to extract from error
-        human_msg = HumanMessage(content=f"Tool '{tool_name}' failed with error: '{error_msg}'. Task: {task_instructions}")
-        result = agents["remediation"].invoke({"messages": [human_msg]})
-        # Parse JSON decision
-        content = result["messages"][-1].content
-        decision = json.loads(content)
-        logger.info("Remediation decision: %s", decision)
-        # Handle decision
-        action = decision.get("action")
+    error_msg = state["last_error"]
+    if "validation" in error_msg.lower():
+        iteration_count = state.get("iteration_count", 0)
+        if iteration_count > 2:
+            action = "abort"
+            reason = "Repeated validation failures"
+            final_synthesis = "Task aborted due to repeated validation failures."
+        else:
+            action = "rephrase"
+            reason = "Validation error"
+            final_synthesis = ""
+        decision = {"action": action, "reason": reason}
         if action == "rephrase":
-            new_query = decision.get("new_args", {}).get("query", "Retry with rephrased query")
-            # Add system message to instruct retry
-            retry_msg = SystemMessage(content=f"Remediation: Rephrase and retry. New query: {new_query}")
+            retry_msg = SystemMessage(content=f"Remediation: Rephrase and retry due to validation error.")
             return {
                 "messages": [retry_msg],
                 "remediation_decision": decision
             }
-        elif action == "fallback":
-            new_tool = decision.get("new_tool", "supervisor")
-            fallback_msg = SystemMessage(content=f"Remediation: Fallback to {new_tool}")
-            return {
-                "messages": [fallback_msg],
-                "remediation_decision": decision
-            }
         elif action == "abort":
-            abort_msg = SystemMessage(content="Remediation: Abort task")
+            abort_msg = SystemMessage(content="Remediation: Abort task due to repeated validation failures")
             return {
                 "messages": [abort_msg],
                 "remediation_decision": decision,
-                "final_synthesis": "Task aborted due to unrecoverable error."
+                "final_synthesis": final_synthesis
             }
-        else:
-            logger.warning("Unknown remediation action: %s", action)
-            return {
-                "messages": [SystemMessage(content="Remediation: Unknown action")],
-                "remediation_decision": decision
-            }
-    except json.JSONDecodeError as e:
-        logger.error("JSON parsing error in remediation: %s", str(e), exc_info=True)
-        return {"messages": [SystemMessage(content=f"Remediation parsing error: {e}")], "last_error": str(e)}
-    except Exception as e:
-        logger.error("Unexpected error in remediation: %s", str(e), exc_info=True)
-        return {"messages": [SystemMessage(content=f"Error in remediation: {e}")], "last_error": str(e)}
+    else:
+        try:
+            # Create message for remediation agent
+            task_instructions = "Process the error and decide on remediation action."
+            tool_name = "unknown"  # Could be improved to extract from error
+            human_msg = HumanMessage(content=f"Tool '{tool_name}' failed with error: '{error_msg}'. Task: {task_instructions}")
+            result = agents["remediation"].invoke({"messages": [human_msg]})
+            # Parse JSON decision
+            content = result["messages"][-1].content
+            decision = json.loads(content)
+            logger.info("Remediation decision: %s", decision)
+            # Handle decision
+            action = decision.get("action")
+            if action == "rephrase":
+                new_query = decision.get("new_args", {}).get("query", "Retry with rephrased query")
+                # Add system message to instruct retry
+                retry_msg = SystemMessage(content=f"Remediation: Rephrase and retry. New query: {new_query}")
+                return {
+                    "messages": [retry_msg],
+                    "remediation_decision": decision
+                }
+            elif action == "fallback":
+                new_tool = decision.get("new_tool", "supervisor")
+                fallback_msg = SystemMessage(content=f"Remediation: Fallback to {new_tool}")
+                return {
+                    "messages": [fallback_msg],
+                    "remediation_decision": decision
+                }
+            elif action == "abort":
+                abort_msg = SystemMessage(content="Remediation: Abort task")
+                return {
+                    "messages": [abort_msg],
+                    "remediation_decision": decision,
+                    "final_synthesis": "Task aborted due to unrecoverable error."
+                }
+            else:
+                logger.warning("Unknown remediation action: %s", action)
+                return {
+                    "messages": [SystemMessage(content="Remediation: Unknown action")],
+                    "remediation_decision": decision
+                }
+        except json.JSONDecodeError as e:
+            logger.error("JSON parsing error in remediation: %s", str(e), exc_info=True)
+            return {"messages": [SystemMessage(content=f"Remediation parsing error: {e}")], "last_error": str(e)}
+        except Exception as e:
+            logger.error("Unexpected error in remediation: %s", str(e), exc_info=True)
+            return {"messages": [SystemMessage(content=f"Error in remediation: {e}")], "last_error": str(e)}
