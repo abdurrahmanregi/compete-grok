@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 from agents import create_agent, agents
 from agents.supervisor import SUPERVISOR_PROMPT
-from agents.schemas import EconPaperOutput, CaseLawOutput, VerifierOutput
+from agents.schemas import EconPaperOutput, CaseLawOutput, VerifierOutput, DocAnalyzerOutput, ExplainerOutput, MarketDefOutput
 from config import SUPERVISOR_MODEL
 from tools import sequential_thinking
 from langchain_core.tools import tool
@@ -336,7 +336,10 @@ def create_workflow(selected_agents: list[str]) -> Any:
                     schemas = {
                         "econpaper": EconPaperOutput,
                         "caselaw": CaseLawOutput,
-                        "verifier": VerifierOutput
+                        "verifier": VerifierOutput,
+                        "docanalyzer": DocAnalyzerOutput,
+                        "explainer": ExplainerOutput,
+                        "marketdef": MarketDefOutput
                     }
                     if agent_name in schemas:
                         last_msg = result["messages"][-1]
@@ -373,12 +376,20 @@ def create_workflow(selected_agents: list[str]) -> Any:
                                         model_class(citations=data)
                                     else:
                                         model_class(**data)
+                                elif agent_name == "docanalyzer":
+                                    if isinstance(data, list):
+                                        model_class(documents=data)
+                                    else:
+                                        model_class(**data)
+                                else:
+                                    # For explainer and marketdef, expect direct object
+                                    model_class(**data)
                                 logger.info(f"Validation successful for {agent_name}")
                             except ValidationError as e:
                                 raise AgentError(f"Validation failed: {e}")
                             except Exception as e:
                                 raise AgentError(f"Output validation failed: {e}")
-                    else:
+                    elif agent_name != "synthesis":
                         logger.warning(f"No schema for {agent_name}, proceeding without validation")
 
                     # Calculate new messages to avoid duplication

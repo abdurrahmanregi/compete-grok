@@ -72,5 +72,12 @@ ENV/
 Thumbs.db
 .kilocode/
 
-# tasks
+# tasks and others
 tasks/
+plans/
+
+# pycache
+__pycache__/
+agents/__pycache__/
+tests/__pycache__/
+tools/__pycache__/

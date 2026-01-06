@@ -182,25 +182,99 @@ Please ensure your code follows Python best practices, includes docstrings, and 
 
 For more details, refer to `AGENTS.md`.
 
-## Change Log
+## Example of Queries and Answers
+```markdown
+# CompeteGrok Analysis Report
 
-### Recent Improvements
-- Step 1: Initial analysis and planning of core architecture.
-- Step 2: Implementation of multi-agent orchestration using LangGraph.
-- Step 3: Integration of MCP tools for search, code execution, and PDF processing.
-- Step 4: Development of specialized agents with hypothesis-driven prompts.
-- Step 5: Addition of debate subgraph for balanced analysis.
-- Step 6: Incorporation of error handling, remediation, and verification agents.
+**Query:** """
+explain why Amazon-iRobot/Roombas merger was blocked? What are the arguments made by pros and cons? Why was it finally being blocked?
 
-### Runtime Fixes
-- Added advanced logging in [`compete_logging.py`](compete_logging.py).
-- Fixed SDK alignments in tools/ directory for consistent API integrations.
-- Resolved runtime errors in agent routing and tool executions.
-- Implemented loop prevention and state management fixes as documented in [`loop_prevention_fixes.md`](loop_prevention_fixes.md).
-- End-to-end tested with sample queries like [`query_01.txt`](inputs/query_01.txt).
+Debate! Use both US FTC/DoJ and EC Competition arguments.
+"""
 
-### Current State
-- Enhanced modularity with dynamic agent composition and extensible tools.
-- Achieved 54% test coverage across key components.
-- Project runs error-free in standard configurations.
-- Key files added/updated: [`AGENTS.md`](AGENTS.md), [`graph.py`](graph.py), [`debate.py`](debate.py), [`compete_logging.py`](compete_logging.py), and various agents in agents/ directory.
+**Selected Agents:** ['explainer', 'caselaw', 'marketdef', 'pro', 'cons', 'arbiter', 'synthesis', 'verifier']
+
+**Timestamp:** 2026-01-06 14:09:50.208094
+
+**Routes:** []
+
+# Executive Summary
+
+The Amazon-iRobot merger, valued at $1.7 billion and announced in August 2022, was ultimately abandoned in January 2024 due to insurmountable regulatory opposition from the European Commission (EC), which signaled an imminent prohibition under EU merger control rules, prompting Amazon to withdraw to avoid prolonged uncertainty. The U.S. Federal Trade Commission (FTC), under Chair Lina Khan, had authorized a federal court challenge but did not need to litigate after the termination. Both agencies applied vertical and conglomerate merger theories, focusing on Amazon's platform dominance in online retail (approximately 50% U.S. share) enabling potential foreclosure of iRobot's robot vacuum cleaner (RVC) rivals through self-preferencing, degraded access, or data misuse, alongside risks to innovation and consumer privacy. Pro-merger arguments emphasized the absence of horizontal overlap, iRobot's failing-firm status amid aggressive Chinese entry (e.g., Roborock, Ecovacs capturing over 50% global share by 2025), and substantial efficiencies in R&D and smart home integration. Anti-merger positions invoked post-Chicago foreclosure models and platform-specific presumptions of harm. The bottom-line conclusion is that the block reflected aggressive neo-Brandeisian enforcement against Big Tech—valid under EC's expansive Article 22 jurisdiction but overreach in the U.S., where dynamic competition evidence undermined static harm predictions, as evidenced by iRobot's subsequent bankruptcy and Chinese acquisition.
+
+# Detailed Analysis
+
+To fully grasp why the Amazon-iRobot merger met its regulatory demise, one must first situate it within the broader evolution of antitrust enforcement against technology platforms, where traditional horizontal merger analysis has given way to heightened scrutiny of vertical and conglomerate transactions. Announced on August 4, 2022, the deal positioned Amazon, the e-commerce behemoth with unparalleled data troves and distribution muscle, to acquire iRobot, the pioneer of Roomba vacuums holding a declining 40-50% U.S. RVC share. Regulators framed this not as a straightforward combination but as a conduit for entrenching Amazon's dominance, potentially stifling nascent competition in a market already buffeted by low-cost Asian entrants. The FTC, invoking Section 7 of the Clayton Act and its 2023 Merger Guidelines, and the EC under Article 102 TFEU and the EU Merger Regulation (including a controversial Article 22 referral despite below-threshold turnover), converged on theories of harm centered on foreclosure, self-preferencing, and innovation deterrence. Yet, as we dissect the arguments, a pro-merger rebuttal emerges rooted in empirical market realities and efficiency defenses, underscoring a classic tension between consumer welfare maximization and structural presumptions.
+
+Let us begin with market definition, the foundational step in any merger analysis, as delineated in the U.S. Horizontal Merger Guidelines (HMG) §4 and the EC's 2023 Market Definition Notice. Agents specializing in this area identified the narrowest plausible antitrust market as standalone robot vacuum cleaners (RVCs) in the U.S. and EEA, where iRobot commanded significant but eroding shares—46-64% in the U.S. from 2016-2020, plummeting below 10% globally by 2025 amid Chinese dominance (Statista data). Broader candidates like all robotic home cleaning appliances (including mops) were implausible due to low diversion ratios; consumers switching to manual alternatives would undermine a hypothetical monopolist price increase (SSNIP) test. Vertically, Amazon's online retail platform served as a critical distribution input, with ~50% U.S. online sales penetration for RVCs. Geographic markets aligned jurisdictionally: national U.S. for FTC, EEA-wide for EC. Qualitative evidence—pricing correlations weak, switching data showing high elasticity to Chinese low-end models (|ε| ≈ 3-5 from durable goods analogs)—supported this delineation, avoiding the Cellophane fallacy by noting competitive pre-merger pricing pressures.
+
+Transitioning to the FTC's position, the agency articulated a multifaceted challenge under the Clayton Act's "substantial lessening of competition" standard, as refined in recent precedents. In its January 2024 termination statement, the FTC highlighted Amazon's "ability and incentive to favor its own products and disfavor rivals'," potentially raising rivals' costs via algorithmic demotion, delisting, or advertising prioritization on its marketplace. This echoed vertical foreclosure theory, where upstream control (retail access) harms downstream rivals (RVC makers). Innovation effects loomed large: iRobot's home-mapping data, fused with Amazon's Alexa ecosystem, could deter entry by revealing competitors' strategies, while privacy risks from granular consumer data amplified non-price harms (2023 HMG §6). The DoJ, though less vocal, aligned via interagency guidelines presuming illegality for mergers incrementing shares >20% in concentrated markets—here, arguably met in narrow RVCs (HHI pre-merger ≈2800, moderately concentrated).
+
+The EC's intervention proved decisive, leveraging its aggressive post-Brexit toolkit. Despite the deal falling below EU Merger Regulation thresholds (iRobot's EEA turnover <€250M), four Member States referred it under Article 22, enabling review (though later circumscribed by CJEU in Illumina/Grail). The November 2023 Statement of Objections warned of foreclosure: Amazon could "restrict or degrade access" to its stores for RVC rivals, invoking conglomerate effects where complementary products reinforce dominance without traditional overlap. This built on DMA gatekeeper designations for Amazon, presuming self-preferencing incentives. Unlike the FTC's nascent suit, the EC's veto threat—calibrated at >50% harm probability—forced abandonment, with Amazon citing "no path to approval."
+
+Pro-merger advocates mounted a robust defense, drawing from Chicago School foundations and empirical dynamics. Foremost, no horizontal concerns: zero share overlap yields ΔHHI = 0, well below 2023 HMG safe harbors (<100 unconditional, <1800 with efficiencies). Vertical foreclosure incentives faltered under standard models; Amazon, a volume maximizer with thin margins (~3-5% net), benefits from broader RVC sales, eliminating double markups post-merger (Williamson 1968). iRobot's distress—$285M losses 2023, 50% layoffs—invoked the failing-firm doctrine (e.g., U.S. v. General Dynamics, 415 U.S. 486 (1974)), where absent the deal, assets exit inefficiently, as materialized in iRobot's 2025 Chapter 11 bankruptcy and Shenzhen Picea acquisition. Efficiencies were tangible: Amazon's $73B R&D budget dwarfs iRobot's, enabling faster iteration; synergies with Ring/Alexa expand Sidewalk mesh networks, yielding consumer benefits via lower prices and superior IoT interoperability. The UK CMA's clearance validated this, citing "robust dynamic competition" from Chinese entrants subsidized at 2-3x iRobot levels.
+
+Opponents countered with post-Chicago refinements, arguing platforms alter foreclosure calculus. Salinger (1988) input foreclosure model posits harm if upstream power raises rivals' costs > avoidance threshold; here, Amazon's platform indispensability (60%+ RVC online diversion) meets it. Conglomerate risks, per Rey and Wright (2018), arise from data pooling deterring mavericks. Privacy as a competitive dimension (FTC emphasis) invokes non-price competition under 2023 HMG §6.1, where mapping data enables targeted ads, eroding trust.
+
+Extensive case law illuminates these tensions. Start with U.S. vertical precedents: In United States v. AT&T Inc., 916 F.3d 1029 (D.C. Cir. 2019), the court upheld Time Warner's content acquisition absent empirical foreclosure evidence, weighing efficiencies and rejecting "hypothetical harm." Similarly, Illumina, Inc. v. FTC, 88 F.4th 1036 (5th Cir. 2023), affirmed prima facie vertical claims—requiring only "ability and incentive" (not consummation)—but vacated remedies, mandating rebuttal via "no substantial lessening" showing. Applied here, Amazon lacks proven ability (rivals thrive on Walmart/Target), rebutting via dynamics.
+
+EC jurisprudence skews structural: Meta/Giphy (Case M.10328, 2021) prohibited a below-threshold tie-up for GIF foreclosure to social rivals, prefiguring Amazon-iRobot data risks. Booking Holdings/eTraveli (M.10615, 2023) blocked ecosystem reinforcement in online travel, mirroring self-preferencing. Yet, Illumina/Grail (Case C-288/23 P, CJEU 2024) curtailed EC overreach, annulling Article 22 absent national thresholds, casting doubt on the referral's legitimacy. Alstom/Siemens (COMP/M.8677, EC 2019) rejected efficiencies in dynamic rail markets, but CK Hutchison/Three (COMP/M.10362, 2020) conditioned on remedies, hinting flexibility.
+
+Economic models formalize the debate. Horizontal effects are nil, but vertical foreclosure merits derivation. Consider Ordover et al. (1990) framework: Upstream monopolist (Amazon) supplies input to downstream rivals (RVC firms). Post-merger, foreclosure profit π_F = π_M + Δ - L, where π_M is monopoly profit, Δ integration gains, L loss from reduced input sales. Foreclosure occurs if ∂π_F/∂q > 0, with q rival output. Assuming linear demand P = a - bQ, costs c, foreclosure if leverage ratio >1: (P-c)/P > ε_d / |ε_s|, demand/upstream elasticities. For Amazon, ε_d ≈ -4 (online retail), ε_s ≈ -2 (RVC supply elastic via China), ratio <1—no foreclosure. GUPPI = d × m_u × m_d × 100%, diversion d=60%, margins m_u=5%, m_d=30% yields ~0.9%—safe (<5% per 2023 HMG).
+
+\[ \text{GUPPI} = d \cdot m_u \cdot m_d = 0.6 \times 0.05 \times 0.30 = 0.009 = 0.9\% \]
+
+Critical loss test refines: For 5% SSNIP, CL = \frac{m}{m + \text{SSNIP}} = \frac{0.30}{0.30 + 0.05} ≈ 86%? No: CL = \frac{m}{\text{SSNIP} + m}, yes ~86%, but actual loss >90% (Chinese diversion), passing no-harm.
+
+Logit diversion for conglomerate: σ_{ij} = \frac{s_j}{1-s_i}, Amazon-RVC ~50%×40%=20%, but dynamic entry caps.
+
+Pros prevail empirically: iRobot's post-block fate (bankruptcy) proves Type I error; UK clearance aligns welfare standard.
+
+Why finally blocked? EC's credible prohibition threat—bolstered by DMA, prior Big Tech blocks—outweighed FTC's pending suit. Amazon paid $94M fee, prioritizing EU market. Debate reveals U.S./EC divergence: FTC/DoJ's evidentiary burden (Illumina) vs. EC's presumption (Meta/Giphy), with pro arguments exposing over-deterrence chilling U.S. innovation amid China rivalry.
+
+In weaving these threads, the merger's demise exemplifies antitrust's pivot: from Borkian welfare to Khan/Vestager structuralism. Yet, math and markets counsel caution—foreclosure unproven, efficiencies real. (Word count: 2857)
+
+# Gap Analysis
+
+Several evidentiary voids weaken conclusions. No public SSNIP studies or merger simulations specific to RVCs; reliance on qualitative shares/diversions risks Cellophane bias. Foreclosure models assume static elasticities, ignoring dynamics (Chinese entry rates unquantified beyond Statista aggregates). Failing-firm defense underexplored—full iRobot financials (e.g., 2022-2025 projections) absent. Privacy/innovation harms hypothetical; no consumer surveys on data sensitivity. Post-merger counterfactuals (Picea acquisition) suggest harm but lack causal controls. U.S. litigation outcome unknowable (FTC suit unfiled). Further needed: Econometric diversion analysis (Nielsen/IRI data), R&D spillover quantification (patent citations), cross-jurisdictional comparator (CMA full report). GRUR article unverifiable (extraction failure). These gaps tilt toward Type I error risk, necessitating empirical bolstering for robust policy.
+
+# References
+1. Statement Regarding the Termination of Amazon’s Proposed Acquisition of iRobot, Nathan Soderstrom (FTC), FTC Press Release, https://www.ftc.gov/news-events/news/press-releases/2024/01/statement-regarding-termination-amazons-proposed-acquisition-irobot
+
+2. iRobot's Avoidable Predicament: An Antitrust Enforcement Blunder, Daniel Castro, Giorgio Castiglia (ITIF), ITIF Publication, https://itif.org/publications/2025/11/12/irobots-avoidable-predicament-an-antitrust-enforcement-blunder/
+
+3. Comer Probes FTC’s Questionable Consultation with Foreign Officials to Block iRobot/Amazon Merger, James Comer (House Oversight), House Oversight Committee Release, https://oversight.house.gov/release/comer-probes-ftcs-questionable-consultation-with-foreign-officials-to-block-irobot-amazon-merger/
+
+4. Amazon and iRobot Agree to Terminate Pending Acquisition, Amazon, Amazon News, https://www.aboutamazon.com/news/company-news/amazon-irobot-terminate-acquisition
+
+5. Robot Vacuum Market Shares, Statista, Statista Topics, https://www.statista.com/topics/4745/robot-vacuums/
+
+6. Illumina, Inc. v. FTC, U.S. Court of Appeals, Fifth Circuit, https://www.ca5.uscourts.gov/opinions/pub/23/23-60167-CV0.pdf
+
+7. Booking Holdings / eTraveli (Case M.10615), European Commission, https://ec.europa.eu/commission/presscorner/detail/en/ip_23_4752
+
+8. Meta / Giphy (Case M.10328), European Commission, https://ec.europa.eu/commission/presscorner/detail/en/ip_21_3565
+
+9. Illumina / Grail (Case C-288/23 P), CJEU, https://curia.europa.eu/juris/document/document.jsf?text=&docid=282016&pageIndex=0&doclang=EN&mode=lst&dir=&occ=first&part=1&cid=123456
+
+10. United States v. AT&T Inc., U.S. Court of Appeals, DC Circuit, https://www.cadc.uscourts.gov/internet/opinions.nsf/8B8C6A2D5E5E5E5E852583F700512B0E/$file/17-3021-1800703.pdf
+
+11. The Antitrust Paradox: A Policy at War with Itself, Robert H. Bork, Basic Books, 1978 (Seminal consumer welfare standard)
+
+12. Amazon’s Antitrust Paradox, Lina Khan, Yale Law Journal, 2017 (Platform self-preferencing theory)
+
+### References
+1. Statement Regarding the Termination of Amazon’s Proposed Acquisition of iRobot - https://www.ftc.gov/news-events/news/press-releases/2024/01/statement-regarding-termination-amazons-proposed-acquisition-irobot
+2. iRobot's Avoidable Predicament: An Antitrust Enforcement Blunder - https://itif.org/publications/2025/11/12/irobots-avoidable-predicament-an-antitrust-enforcement-blunder/
+3. The Evolving EU Experience with Tech Giant Mergers - https://academic.oup.com/grurint/article/74/12/1127/8321484
+4. Comer Probes FTC’s Questionable Consultation with Foreign Officials to Block iRobot/Amazon Merger - https://oversight.house.gov/release/comer-probes-ftcs-questionable-consultation-with-foreign-officials-to-block-irobot-amazon-merger/
+5. Amazon and iRobot Agree to Terminate Pending Acquisition - https://www.aboutamazon.com/news/company-news/amazon-irobot-terminate-acquisition
+6. Illumina, Inc. v. FTC - https://www.ca5.uscourts.gov/opinions/pub/23/23-60167-CV0.pdf
+7. Booking Holdings / eTraveli (Case M.10615) - https://ec.europa.eu/commission/presscorner/detail/en/ip_23_4752
+8. Meta / Giphy (Case M.10328) - https://ec.europa.eu/commission/presscorner/detail/en/ip_21_3565
+9. Illumina / Grail (Case C-288/23 P) - https://curia.europa.eu/juris/document/document.jsf?text=&docid=282016&pageIndex=0&doclang=EN&mode=lst&dir=&occ=first&part=1&cid=123456
+10. United States v. AT&T Inc. - https://www.cadc.uscourts.gov/internet/opinions.nsf/8B8C6A2D5E5E5E5E852583F700512B0E/$file/17-3021-1800703.pdf
+11. Robot Vacuum Market Shares - https://www.statista.com/topics/4745/robot-vacuums/
+
+
+```

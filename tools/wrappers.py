@@ -16,7 +16,7 @@ class ToolExecutionError(Exception):
 @lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def tavily_search(query: str, time_range: str = "year") -> dict:
-    result = _tavily_search(query, time_range)
+    result = _tavily_search.invoke({"query": query, "time_range": time_range})
     if STRICT_MODE and "Mock" in result.get("content", ""):
         raise ToolExecutionError(f"tavily_search failed: {result['content']}")
     return result
@@ -25,7 +25,7 @@ def tavily_search(query: str, time_range: str = "year") -> dict:
 @lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def linkup_search(query: str) -> dict:
-    result = _linkup_search(query)
+    result = _linkup_search.invoke({"query": query})
     if STRICT_MODE and "Mock" in result.get("content", ""):
         raise ToolExecutionError(f"linkup_search failed: {result['content']}")
     return result
@@ -34,7 +34,7 @@ def linkup_search(query: str) -> dict:
 @lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def linkup_fetch(url: str) -> dict:
-    result = _linkup_fetch(url)
+    result = _linkup_fetch.invoke({"url": url})
     if STRICT_MODE and "Mock" in result.get("content", ""):
         raise ToolExecutionError(f"linkup_fetch failed: {result['content']}")
     return result
@@ -43,7 +43,7 @@ def linkup_fetch(url: str) -> dict:
 @lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def tavily_extract(url: str) -> dict:
-    result = _tavily_extract(url)
+    result = _tavily_extract.invoke({"url": url})
     if STRICT_MODE and "Mock" in result.get("content", ""):
         raise ToolExecutionError(f"tavily_extract failed: {result['content']}")
     return result
@@ -52,7 +52,7 @@ def tavily_extract(url: str) -> dict:
 @lru_cache(maxsize=128)
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def convert_pdf_url(url: str) -> str:
-    result = _convert_pdf_url(url)
+    result = _convert_pdf_url.invoke({"url": url})
     if STRICT_MODE and "Mock" in result:
         raise ToolExecutionError(f"convert_pdf_url failed: {result}")
     return result

@@ -38,3 +38,33 @@ class VerifiedCitation(BaseModel):
 
 class VerifierOutput(BaseModel):
     citations: List[VerifiedCitation]
+
+class DocAnalysis(BaseModel):
+    doc_id: int
+    title: str
+    summary: str
+    key_findings: str
+    implications: str
+    verified_via: Optional[str] = None
+
+class DocAnalyzerOutput(BaseModel):
+    documents: List[DocAnalysis]
+
+class Source(BaseModel):
+    title: str
+    url: Optional[str] = None
+    year: Optional[int] = None
+    authors: Optional[str] = None
+    court: Optional[str] = None
+    snippet: Optional[str] = None
+
+class ExplainerOutput(BaseModel):
+    explanation: str
+    caveats: str
+    sources: List[Source]
+
+class MarketDefOutput(BaseModel):
+    market_definition: str
+    evidence_evaluation: str
+    conclusion: str
+    sources: List[Source]

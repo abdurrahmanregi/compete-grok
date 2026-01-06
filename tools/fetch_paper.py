@@ -2,19 +2,19 @@ from langchain_core.tools import tool
 from .convert_pdf_url import convert_pdf_url
 from .tavily_search import tavily_search
 from .tavily_extract import tavily_extract
-from .linkup_fetch import linkup_fetch
 import logging
-import time
 import re
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
 @tool
 def fetch_paper_content(url: str, title: str = "", authors: str = "") -> dict:
     """
-    Robustly fetch paper content from a URL.
-    If the URL is a PDF and fails (e.g., 403), it searches for alternative URLs.
-    If it's not a PDF, it uses extraction.
+    Robustly fetch paper content with fallback strategy:
+    1. Direct PDF (convert_pdf_url)
+    2. Alternative Search (Pre-print/Author Site via Tavily)
+    3. HTML Fallback (tavily_extract)
     
     Args:
         url: The primary URL to fetch.
@@ -22,85 +22,114 @@ def fetch_paper_content(url: str, title: str = "", authors: str = "") -> dict:
         authors: The authors of the paper (optional, used for alternative search).
         
     Returns:
-        dict: {"content": "...", "source": "..."} or error.
+        dict: {"content": "...", "source": "...", "doi": "..."} or error.
     """
-    try:
-        is_pdf = url.lower().endswith('.pdf')
-        
-        if is_pdf:
-            try:
-                # Note: convert_pdf_url returns a dict or str depending on implementation.
-                # The current implementation in tools/convert_pdf_url.py returns a dict.
-                result = convert_pdf_url(url)
-                
-                if isinstance(result, dict) and result.get("success"):
-                    return {"content": result["content"], "source": url}
-                
-                # Handle 403 or failure
-                if isinstance(result, dict) and (result.get("error") == "403 Forbidden" or not result.get("success")):
-                    logger.info(f"PDF fetch failed for {url}. Attempting alternative search.")
-                    if not title:
-                        # Try to extract title from URL
-                        match = re.search(r'/([^/]+)\.pdf', url)
-                        title = match.group(1) if match else "unknown paper"
-                    
-                    # Search for alternatives
-                    # Construct a more robust query including authors and working paper keywords
-                    author_part = f"{authors} " if authors else ""
-                    query = f'"{title}" {author_part}(NBER OR SSRN OR "working paper") filetype:pdf'
-                    
-                    try:
-                        search_res = tavily_search(query, time_range="year")
-                        
-                        # Try alternatives
-                        if isinstance(search_res, dict) and "sources" in search_res:
-                            for source in search_res["sources"]:
-                                alt_url = source.get("url")
-                                if alt_url and alt_url != url and alt_url.lower().endswith('.pdf'):
-                                    logger.info(f"Trying alternative URL: {alt_url}")
-                                    try:
-                                        alt_res = convert_pdf_url(alt_url)
-                                        if isinstance(alt_res, dict) and alt_res.get("success"):
-                                            return {"content": alt_res["content"], "source": alt_url}
-                                    except Exception:
-                                        continue
-                    except Exception as e:
-                        logger.warning(f"Alternative search failed: {e}")
-                
-                # If PDF conversion failed or no alternatives found, try HTML extraction as final fallback
-                logger.info(f"PDF conversion failed for {url} and alternatives. Attempting HTML extraction as final fallback.")
-                try:
-                    # Try extracting from the original URL first
-                    html_res = tavily_extract(url)
-                    content = html_res.get("content", "")
-                    if content and "Mock" not in content and len(content) > 100:
-                        return {"content": f"[HTML Fallback] {content}", "source": url}
-                    
-                    # If original URL fails, and we had an alternative URL, try that
-                    # (This logic would require tracking the best alternative URL, which we might not have easily here without refactoring)
-                    # For now, just falling back to original URL HTML extraction is a good step.
-                except Exception as html_e:
-                    logger.warning(f"HTML fallback failed: {html_e}")
+    
+    # Helper to extract DOI
+    def extract_doi(text):
+        if not text:
+            return None
+        # Common DOI regex patterns
+        doi_pattern = r'\b(10\.\d{4,9}/[-._;()/:A-Z0-9]+)\b'
+        match = re.search(doi_pattern, text, re.IGNORECASE)
+        return match.group(1) if match else None
 
-                error_msg = result.get('error') if isinstance(result, dict) else str(result)
-                return {"content": f"Failed to retrieve PDF content for {url}. Error: {error_msg}. HTML fallback also failed.", "source": url}
-                
-            except Exception as e:
-                 return {"content": f"Error processing PDF {url}: {e}", "source": url}
-        else:
-            # Not a PDF, use extract
+    # Helper to extract title from URL if not provided
+    def extract_title_from_url(url_str):
+        try:
+            path = urllib.parse.urlparse(url_str).path
+            filename = path.split('/')[-1]
+            # Remove extension and replace separators with spaces
+            name = re.sub(r'\.[^.]+$', '', filename)
+            return name.replace('-', ' ').replace('_', ' ')
+        except Exception:
+            return "unknown paper"
+
+    # 1. Try Direct PDF
+    # Check if URL ends with .pdf or we have strong reason to believe it's a PDF
+    try:
+        is_pdf_url = url.lower().endswith('.pdf')
+        
+        if is_pdf_url:
+            logger.info(f"Attempting direct PDF conversion for {url}")
             try:
-                # Try tavily_extract first
-                res = tavily_extract(url)
-                content = res.get("content", "")
-                if content and "Mock" not in content and len(content) > 100:
-                     return {"content": content, "source": url}
+                result = convert_pdf_url.invoke({"url": url})
                 
-                # Fallback to linkup_fetch
-                logger.info(f"Tavily extract failed or empty for {url}, trying Linkup.")
-                res = linkup_fetch(url)
-                return {"content": res.get("content", ""), "source": url}
+                if isinstance(result, dict) and result.get('success'):
+                    content = result.get('content', "")
+                    return {
+                        "content": content, 
+                        "source": url, 
+                        "doi": extract_doi(content)
+                    }
             except Exception as e:
-                return {"content": f"Error extracting {url}: {e}", "source": url}
+                logger.warning(f"Direct PDF conversion failed for {url}: {e}")
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.warning(f"Error checking PDF URL: {e}")
+    
+    # 2. Alternative Search (Fallback)
+    # If direct PDF failed or wasn't a PDF URL, but we suspect it's a paper
+    # We only do this if we have a title or can derive one, or if the original URL failed
+    logger.info("Attempting alternative search (Pre-print/Author Site)...")
+    
+    if not title:
+        title = extract_title_from_url(url)
+    
+    # Construct queries to find free versions
+    queries = [
+        f'"{title}" filetype:pdf',
+        f'"{title}" {authors} (NBER OR SSRN OR IZA OR "Working Paper")',
+        f'"{title}" {authors} site:.edu'
+    ]
+    
+    for query in queries:
+        try:
+            # Use a restrictive time range to get recent versions if possible, but default is fine
+            search_res = tavily_search.invoke({"query": query})
+            
+            if isinstance(search_res, dict) and "sources" in search_res:
+                for source in search_res['sources']:
+                    alt_url = source.get('url')
+                    # We are looking for PDFs specifically in this step
+                    if alt_url and alt_url.lower().endswith('.pdf') and alt_url != url:
+                        logger.info(f"Found alternative PDF: {alt_url}")
+                        try:
+                            res = convert_pdf_url.invoke({"url": alt_url})
+                            if isinstance(res, dict) and res.get('success'):
+                                content = res.get('content', "")
+                                return {
+                                    "content": content, 
+                                    "source": alt_url, 
+                                    "doi": extract_doi(content)
+                                }
+                        except Exception as e:
+                            logger.warning(f"Alternative PDF conversion failed for {alt_url}: {e}")
+        except Exception as e:
+            logger.warning(f"Alternative search query '{query}' failed: {e}")
+            continue
+
+    # 3. HTML Fallback
+    # If we are here, Direct PDF failed (or wasn't PDF) and Alt Search failed to find a PDF.
+    # Try to extract content from the original URL using Tavily Extract.
+    logger.info(f"Falling back to HTML extraction for {url}...")
+    try:
+        html_res = tavily_extract.invoke({"url": url})
+        content = html_res.get('content', "")
+        
+        if content and "Mock" not in content and len(content) > 100:
+             return {
+                "content": content,
+                "source": url,
+                "doi": extract_doi(content),
+                "status": "fallback_html"
+            }
+    except Exception as e:
+        logger.warning(f"HTML extraction failed: {e}")
+
+    # 4. Error Handling
+    return {
+        "content": "Failed to retrieve content. Direct PDF conversion failed, alternative PDF search yielded no results, and HTML extraction failed.",
+        "source": url,
+        "doi": None,
+        "error": True
+    }

@@ -26,7 +26,26 @@ Always:
 
 - Highlight jurisdictional differences in application
 
-Think sequentially/harder; formulate caveats hypotheses. Always use search tools to retrieve current, verified information and sources. Do not rely on internal knowledge for data points. For comprehensive research, always use tavily_search first for broad coverage with concise queries (under 300 characters to stay below Tavily's 400-character limit); split complex queries into sub-queries if needed. Then use linkup_search for deep analysis, combining results. For efficiency, use a two-step process: Initial tavily_search for URLs, then tavily_extract for content. Derive step-by-step with LaTeX; highlight caveats (e.g., "IIA fails here"). Always use \( ... \) for inline and \[ ... \] for display math in explanations. Adaptive: Use plain language for general audiences and technical details for experts. Use sequentialthinking for deep hypothesis testing; run_code_py for verifications. Audit LaTeX per rules. Include a 'Sources' section listing URLs/titles of all sources used. Consider jurisdictional specificity. Use structured outputs for hypotheses."""
+Think sequentially/harder; formulate caveats hypotheses. Always use search tools to retrieve current, verified information and sources. Do not rely on internal knowledge for data points. For comprehensive research, always use tavily_search first for broad coverage with concise queries (under 300 characters to stay below Tavily's 400-character limit); split complex queries into sub-queries if needed. Use `tavily_search` with `time_range` set to 'year' (default), 'month', 'week', or 'day'. Do NOT use '2y', '5y', etc. Then use linkup_search for deep analysis, combining results. For efficiency, use a two-step process: Initial tavily_search for URLs, then tavily_extract for content. Derive step-by-step with LaTeX; highlight caveats (e.g., "IIA fails here"). Always use \( ... \) for inline and \[ ... \] for display math in explanations. Adaptive: Use plain language for general audiences and technical details for experts. Use sequentialthinking for deep hypothesis testing; run_code_py for verifications. Audit LaTeX per rules. Include a 'Sources' section listing URLs/titles of all sources used. Consider jurisdictional specificity.
+
+**OUTPUT FORMAT:**
+You must output a single JSON object with the following structure:
+{{
+  "explanation": "Full explanation text with LaTeX...",
+  "caveats": "Detailed caveats and assumptions...",
+  "sources": [
+    {{
+      "title": "Source Title",
+      "url": "https://...",
+      "year": 2023,
+      "authors": "Author Names",
+      "court": "Court Name (if case)",
+      "snippet": "Brief snippet..."
+    }}
+  ]
+}}
+Do not include markdown formatting (like ```json) around the output.
+"""
 
 
 def create_explainer_agent() -> Any:

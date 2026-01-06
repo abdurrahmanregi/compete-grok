@@ -20,6 +20,10 @@ user_agents = [
 def tavily_extract(url: str, extract_depth: str = "basic", format: str = "markdown") -> dict:
     """Tavily web content extraction with anti-bot headers and fallback."""
     try:
+        # PDF validation
+        if url.lower().endswith('.pdf'):
+            raise ValueError(f"tavily_extract cannot handle PDF files directly ({url}). Please use 'fetch_paper_content' instead.")
+
         # URL validation
         try:
             headers = {"User-Agent": random.choice(user_agents)}
@@ -58,16 +62,25 @@ def tavily_extract(url: str, extract_depth: str = "basic", format: str = "markdo
                 raise ValueError("Empty results from Tavily extract")
     except Exception as e:
         logger.error(f"Error in tavily_extract: {e}")
-        # Fallback to linkup_fetch
+        
+        # Fallback 1: Stealth Browser (Playwright)
         try:
-            from tools.linkup_fetch import linkup_fetch
-            fallback_result = linkup_fetch.invoke({"url": url})
-            return fallback_result
-        except Exception as fallback_e:
-            logger.error(f"Fallback failed: {fallback_e}")
-            mock_content = f"Mock tavily_extract('{url}'): Extracted markdown: # Title\nContent... Error: {str(e)[:300]}"
-            mock_sources = [{"url": url, "title": "Mock Extracted Title", "snippet": "Mock snippet"}]
-            return {"content": mock_content, "sources": mock_sources}
+            logger.info(f"Attempting stealth browser fallback for {url}")
+            from tools.stealth_browser import stealth_scrape
+            return stealth_scrape(url)
+        except Exception as stealth_e:
+            logger.error(f"Stealth browser fallback failed: {stealth_e}")
+
+            # Fallback 2: Linkup Fetch
+            try:
+                from tools.linkup_fetch import linkup_fetch
+                fallback_result = linkup_fetch.invoke({"url": url})
+                return fallback_result
+            except Exception as fallback_e:
+                logger.error(f"Fallback failed: {fallback_e}")
+                mock_content = f"Mock tavily_extract('{url}'): Extracted markdown: # Title\nContent... Error: {str(e)[:300]}"
+                mock_sources = [{"url": url, "title": "Mock Extracted Title", "snippet": "Mock snippet"}]
+                return {"content": mock_content, "sources": mock_sources}
 
 # Temporary test block
 # result = tavily_extract("https://example.com/protected.pdf")
